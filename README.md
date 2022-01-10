@@ -1,13 +1,17 @@
-# D-Scanner
-
-[![CI status](https://travis-ci.org/dlang-community/D-Scanner.svg?branch=master)](https://travis-ci.org/dlang-community/D-Scanner/)
-[![Latest version](https://img.shields.io/dub/v/dscanner.svg)](http://code.dlang.org/packages/dscanner)
-[![License](https://img.shields.io/dub/l/dscanner.svg)](http://code.dlang.org/packages/dscanner)
+# D-Scanner fork that uses dmd as a library (WIP)
 
 D-Scanner is a tool for analyzing D source code
 
 ### Building and installing
-First make sure that you have all the source code. Run ```git submodule update --init --recursive```
+
+First, make sure that you have fetched the upstream: git@github.com:dlang-community/D-Scanner.git
+
+```
+git remote add upstream git@github.com:dlang-community/D-Scanner.git
+git fetch upstream
+```
+
+Secondly, make sure that you have all the source code. Run ```git submodule update --init --recursive```
 after cloning the project.
 
 To build D-Scanner, run ```make``` (or the build.bat file on Windows).
