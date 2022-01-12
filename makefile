@@ -6,6 +6,32 @@ DMD := $(DC)
 GDC := gdc
 LDC := ldc2
 OBJ_DIR := obj
+DMD_ROOT_SRC := \
+	$(shell find dmd/src/dmd/common -name "*.d")\
+	$(shell find dmd/src/dmd/root -name "*.d")
+DMD_LEXER_SRC := \
+	dmd/src/dmd/console.d \
+	dmd/src/dmd/entity.d \
+	dmd/src/dmd/errors.d \
+	dmd/src/dmd/file_manager.d \
+	dmd/src/dmd/globals.d \
+	dmd/src/dmd/id.d \
+	dmd/src/dmd/identifier.d \
+	dmd/src/dmd/lexer.d \
+	dmd/src/dmd/tokens.d \
+	dmd/src/dmd/utils.d \
+	$(DMD_ROOT_SRC)
+
+DMD_PARSER_SRC := \
+	dmd/src/dmd/astbase.d \
+	dmd/src/dmd/parse.d \
+	dmd/src/dmd/parsetimevisitor.d \
+	dmd/src/dmd/transitivevisitor.d \
+	dmd/src/dmd/permissivevisitor.d \
+	dmd/src/dmd/strictvisitor.d \
+	dmd/src/dmd/astenums.d \
+	$(DMD_LEXER_SRC)
+
 LIB_SRC := \
 	$(shell find containers/src -name "*.d")\
 	$(shell find dsymbol/src -name "*.d")\
@@ -14,7 +40,8 @@ LIB_SRC := \
 	$(shell find libdparse/src/dparse/ -name "*.d")\
 	$(shell find libddoc/src -name "*.d") \
 	$(shell find libddoc/common/source -name "*.d") \
-	$(shell find stdx-allocator/source -name "*.d")
+	$(shell find stdx-allocator/source -name "*.d") \
+	$(DMD_PARSER_SRC)
 PROJECT_SRC := $(shell find src/ -name "*.d")
 SRC := $(LIB_SRC) $(PROJECT_SRC)
 INCLUDE_PATHS = \
@@ -26,13 +53,13 @@ INCLUDE_PATHS = \
 	-Ilibddoc/src \
 	-Ilibddoc/common/source \
 	-Istdx-allocator/source
-VERSIONS =
+VERSIONS = -version=CallbackAPI -version=DMDLIB
 DEBUG_VERSIONS = -version=dparse_verbose
-DMD_FLAGS = -w -release -O -Jbin -od${OBJ_DIR} -version=StdLoggerDisableWarning
+DMD_FLAGS = -w -release -O -Jbin -Jdmd -od${OBJ_DIR} -version=StdLoggerDisableWarning
 override DMD_FLAGS += $(DFLAGS)
 override LDC_FLAGS += $(DFLAGS)
 override GDC_FLAGS += $(DFLAGS)
-DMD_TEST_FLAGS = -w -g -Jbin -version=StdLoggerDisableWarning
+DMD_TEST_FLAGS = -w -g -Jbin -Jdmd -version=StdLoggerDisableWarning
 override LDC_FLAGS += -O5 -release -oq -d-version=StdLoggerDisableWarning
 override GDC_FLAGS += -O3 -frelease -d-version=StdLoggerDisableWarning
 SHELL:=/usr/bin/env bash
@@ -59,7 +86,7 @@ ldcbuild: githash
 
 # compile the dependencies separately, s.t. their unittests don't get executed
 bin/dscanner-unittest-lib.a: ${LIB_SRC}
-	${DC} ${DMD_TEST_FLAGS} -c ${INCLUDE_PATHS} ${LIB_SRC} -of$@
+	${DC} ${DMD_TEST_FLAGS} -c ${VERSIONS} ${INCLUDE_PATHS} ${LIB_SRC} -of$@
 
 test: bin/dscanner-unittest-lib.a githash
 	${DC} ${DMD_TEST_FLAGS} -unittest ${INCLUDE_PATHS} bin/dscanner-unittest-lib.a ${PROJECT_SRC} -ofbin/dscanner-unittest
