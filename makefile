@@ -52,7 +52,8 @@ INCLUDE_PATHS = \
 	-Icontainers/src \
 	-Ilibddoc/src \
 	-Ilibddoc/common/source \
-	-Istdx-allocator/source
+	-Istdx-allocator/source \
+	-Idmd/src
 VERSIONS = -version=CallbackAPI -version=DMDLIB
 DEBUG_VERSIONS = -version=dparse_verbose
 DMD_FLAGS = -w -release -O -Jbin -Jdmd -od${OBJ_DIR} -version=StdLoggerDisableWarning
