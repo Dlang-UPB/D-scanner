@@ -299,7 +299,19 @@ else
 		}
 		else if (imports || recursiveImports)
 		{
-			printImports(usingStdin, args, importPaths, recursiveImports);
+			// import std.stdio : writeln;
+			// writeln(args);
+			// string[2] args2;
+			// args2[0] = "dscanner";
+			// args2[1] = "/home/lucica/test.txt";
+			// writeln(args2);
+			// writeln(usingStdin);
+			// printImports(usingStdin, args, importPaths, recursiveImports);
+			printImports(
+				false,
+				args,
+				[],
+				false);
 		}
 		else if (ast || outline)
 		{

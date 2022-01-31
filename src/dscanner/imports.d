@@ -49,13 +49,20 @@ extern(C++) class ImportVisitor(AST) : ParseTimeTransitiveVisitor!AST
 
 private void visitFile(bool usingStdin, string fileName, RedBlackTree!string importedModules)
 {
+	import std.stdio : writeln;
 	Id.initialize();
 	global._init();
 	global.params.useUnitTests = true;
 	ASTBase.Type._init();
 
 	auto id = Identifier.idPool(fileName);
-	auto m = new ASTBase.Module(&(fileName.dup)[0], id, false, false);
+	// auto fname = fileName.dup;
+	auto loc = Loc();
+	auto m = new ASTBase.Module(loc, fileName, id, false, false);
+	// m.set = FileName(fileName);
+	writeln(fileName);
+	writeln(m.srcfile);
+	// auto m = new ASTBase.Module(fname.ptr, id, false, false);
 	auto input = readText(fileName);
 
 	scope p = new Parser!ASTBase(m, input, false);
@@ -123,4 +130,36 @@ void printImports(bool usingStdin, string[] args, string[] importPaths, bool rec
 	}
 	foreach (resolved; resolvedLocations[])
 		writeln(resolved);
+}
+
+unittest
+{
+	import std.stdio;
+	import std.file;
+
+   	File file = File("/home/lucica/test.txt", "w");
+
+	file.write(
+q{import std.stdio;
+import std.fish : scales, head;
+import DAGRON = std.experimental.dragon;
+import std.file;
+});
+
+	file.close();
+
+	string[2] args;
+	args[0] = "dscanner";
+	args[1] = "/home/lucica/test.txt";
+
+	printImports(
+		false,
+		args,
+		[],
+		false);
+
+	// import std.process;
+	// executeShell(escapeShellCommand("dscanner", "-i", "test.txt") ~ ">" ~ escapeShellFileName("test.txt.out"));
+
+	stderr.writeln("Unittest for New Imports Module passed.");
 }

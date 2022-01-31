@@ -56,11 +56,11 @@ INCLUDE_PATHS = \
 	-Idmd/src
 VERSIONS = -version=CallbackAPI -version=DMDLIB
 DEBUG_VERSIONS = -version=dparse_verbose
-DMD_FLAGS = -w -release -O -Jbin -Jdmd -od${OBJ_DIR} -version=StdLoggerDisableWarning
+DMD_FLAGS = -w -release -O -lowmem -Jbin -Jdmd -od${OBJ_DIR} -version=StdLoggerDisableWarning
 override DMD_FLAGS += $(DFLAGS)
 override LDC_FLAGS += $(DFLAGS)
 override GDC_FLAGS += $(DFLAGS)
-DMD_TEST_FLAGS = -w -g -Jbin -Jdmd -version=StdLoggerDisableWarning
+DMD_TEST_FLAGS = -w -release -lowmem -O -Jbin -Jdmd -version=StdLoggerDisableWarning
 override LDC_FLAGS += -O5 -release -oq -d-version=StdLoggerDisableWarning
 override GDC_FLAGS += -O3 -frelease -d-version=StdLoggerDisableWarning
 SHELL:=/usr/bin/env bash
