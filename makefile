@@ -90,7 +90,7 @@ bin/dscanner-unittest-lib.a: ${LIB_SRC}
 	${DC} ${DMD_TEST_FLAGS} -c ${VERSIONS} ${INCLUDE_PATHS} ${LIB_SRC} -of$@
 
 test: bin/dscanner-unittest-lib.a githash
-	${DC} ${DMD_TEST_FLAGS} -unittest ${INCLUDE_PATHS} bin/dscanner-unittest-lib.a ${PROJECT_SRC} -ofbin/dscanner-unittest
+	${DC} ${DMD_TEST_FLAGS} ${VERSIONS} -unittest ${INCLUDE_PATHS} bin/dscanner-unittest-lib.a ${PROJECT_SRC} -ofbin/dscanner-unittest
 	./bin/dscanner-unittest
 	rm -f bin/dscanner-unittest
 
