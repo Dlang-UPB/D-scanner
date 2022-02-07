@@ -20,9 +20,9 @@ jobs:
             - name: Run style checks
               run: |
                   source ~/dlang/*/activate
-                  make style
+                  make -j8 style
 
             - name: Run tests
               run: |
                   source ~/dlang/*/activate
-                  make test
+                  make -j8 test
