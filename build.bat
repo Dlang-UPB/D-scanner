@@ -18,8 +18,8 @@ if %githashsize% == 0 (
 	move /y bin\githash_.txt bin\githash.txt
 )
 
-set DFLAGS=-O -release -version=StdLoggerDisableWarning -Jbin %MFLAGS%
-set TESTFLAGS=-g -w -version=StdLoggerDisableWarning -Jbin
+set DFLAGS=-O -release -version=StdLoggerDisableWarning -version=CallbackAPI -version=DMDLIB -Jbin -Jdmd %MFLAGS%
+set TESTFLAGS=-g -w -version=StdLoggerDisableWarning -version=CallbackAPI -version=DMDLIB -Jbin -Jdmd
 set CORE=
 set LIBDPARSE=
 set STD=
@@ -30,6 +30,31 @@ set CONTAINERS=
 set LIBDDOC=
 set STDXALLOCATOR=
 set STDXALLOCATORBLOCKS=
+
+set DMD_ROOT_SRC=
+for %%x in (dmd\src\dmd\common\*.d) do set DMD_ROOT_SRC=!DMD_ROOT_SRC! %%x
+for %%x in (dmd\src\dmd\root\*.d) do set DMD_ROOT_SRC=!DMD_ROOT_SRC! %%x
+
+set DMD_LEXER_SRC=^
+	dmd\src\dmd\console.d ^
+	dmd\src\dmd\entity.d ^
+	dmd\src\dmd\errors.d ^
+	dmd\src\dmd\file_manager.d ^
+	dmd\src\dmd\globals.d ^
+	dmd\src\dmd\id.d ^
+	dmd\src\dmd\identifier.d ^
+	dmd\src\dmd\lexer.d ^
+	dmd\src\dmd\tokens.d ^
+	dmd\src\dmd\utils.d
+
+set DMD_PARSER_SRC=^
+	dmd\src\dmd\astbase.d ^
+	dmd\src\dmd\parse.d ^
+	dmd\src\dmd\parsetimevisitor.d ^
+	dmd\src\dmd\transitivevisitor.d ^
+	dmd\src\dmd\permissivevisitor.d ^
+	dmd\src\dmd\strictvisitor.d ^
+	dmd\src\dmd\astenums.d
 
 for %%x in (src\dscanner\*.d) do set CORE=!CORE! %%x
 for %%x in (src\dscanner\analysis\*.d) do set ANALYSIS=!ANALYSIS! %%x
@@ -49,14 +74,71 @@ for %%x in (stdx-allocator\source\stdx\allocator\building_blocks\*.d) do set STD
 if "%1" == "test" goto test_cmd
 
 @echo on
-%DC% %MFLAGS% %CORE% %STD% %LIBDPARSE% %LIBDDOC% %ANALYSIS% %INIFILED% %DSYMBOL% %CONTAINERS% %STDXALLOCATOR% %STDXALLOCATORBLOCKS% %DFLAGS% -I"libdparse\src" -I"dsymbol\src" -I"containers\src" -I"libddoc\src" -I"libddoc\common\source" -I"stdx-allocator\source" -ofbin\dscanner.exe
+%DC% %MFLAGS%^
+	%CORE%^
+	%STD%^
+	%LIBDPARSE%^
+	%LIBDDOC%^
+	%ANALYSIS%^
+	%INIFILED%^
+	%DSYMBOL%^
+	%CONTAINERS%^
+	%STDXALLOCATOR%^
+	%STDXALLOCATORBLOCKS%^
+	%DMD_ROOT_SRC%^
+	%DMD_LEXER_SRC%^
+	%DMD_PARSER_SRC%^
+	%DFLAGS%^
+	-I"libdparse\src"^
+	-I"dsymbol\src"^
+	-I"containers\src"^
+	-I"libddoc\src"^
+	-I"libddoc\common\source"^
+	-I"stdx-allocator\source"^
+	-I"dmd\src"^
+	-ofbin\dscanner.exe
+
 goto eof
 
 :test_cmd
 @echo on
 set TESTNAME="bin\dscanner-unittest"
-%DC% %MFLAGS% %STD% %LIBDPARSE% %LIBDDOC% %INIFILED% %DSYMBOL% %CONTAINERS% %STDXALLOCATOR% %STDXALLOCATORBLOCKS% -I"libdparse\src" -I"dsymbol\src" -I"containers\src" -I"libddoc\src" -I"stdx-allocator\source" -lib %TESTFLAGS% -of%TESTNAME%.lib
-if exist %TESTNAME%.lib %DC% %MFLAGS% %CORE% %ANALYSIS% %TESTNAME%.lib -I"src" -I"inifiled\source" -I"libdparse\src" -I"dsymbol\src" -I"containers\src" -I"libddoc\src" -I"libddoc\common\source" -I"stdx-allocator\source" -unittest %TESTFLAGS% -of%TESTNAME%.exe
+%DC% %MFLAGS% ^
+	%STD%^
+	%LIBDPARSE%^
+	%LIBDDOC%^
+	%INIFILED%^
+	%DSYMBOL%^
+	%CONTAINERS%^
+	%STDXALLOCATOR%^
+	%STDXALLOCATORBLOCKS%^
+	%DMD_ROOT_SRC%^
+	%DMD_LEXER_SRC%^
+	%DMD_PARSER_SRC%^
+	-I"libdparse\src"^
+	-I"dsymbol\src"^
+	-I"containers\src"^
+	-I"libddoc\src"^
+	-I"stdx-allocator\source"^
+	-I"dmd\src"^
+	-lib %TESTFLAGS%^
+	-of%TESTNAME%.lib
+if exist %TESTNAME%.lib %DC% %MFLAGS%^
+	%CORE%^
+	%ANALYSIS%^
+	%TESTNAME%.lib^
+	-I"src"^
+	-I"inifiled\source"^
+	-I"libdparse\src"^
+	-I"dsymbol\src"^
+	-I"containers\src"^
+	-I"libddoc\src"^
+	-I"libddoc\common\source"^
+	-I"stdx-allocator\source"^
+	-I"dmd\src"^
+	-unittest^
+	%TESTFLAGS%^
+	-of%TESTNAME%.exe
 if exist %TESTNAME%.exe %TESTNAME%.exe
 
 if exist %TESTNAME%.obj del %TESTNAME%.obj
