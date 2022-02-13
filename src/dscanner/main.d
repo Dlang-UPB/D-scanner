@@ -272,9 +272,25 @@ else
 		{
 			if (usingStdin)
 			{
-				LexerConfig config;
-				config.stringBehavior = StringBehavior.source;
-				auto tokens = byToken(readStdin(), config, &cache);
+				// LexerConfig config;
+				// config.stringBehavior = StringBehavior.source;
+				// auto tokens = byToken(readStdin(), config, &cache);
+
+				import dmd.lexer;
+				import dmd.tokens;
+				auto source = readStdin();
+				scope lexer = new Lexer(null, cast(char*)source.ptr, 0, source.length, false, false, true);
+				// lexer.tokenizeWhitespaces(true);
+				// lexer.nextToken;
+				auto tokens = lexer.tokenize();
+
+				// TOK[] tokens;
+				// do
+				// {
+				// 	tokens ~= lexer.token.value;
+				// } while (lexer.nextToken != TOK.endOfFile);
+
+
 				if (tokenCount)
 					printTokenCount(stdout, "stdin", tokens);
 				else
@@ -285,10 +301,24 @@ else
 				ulong count;
 				foreach (f; expandArgs(args))
 				{
+					import dmd.lexer;
+					import dmd.tokens;
 
-					LexerConfig config;
-					config.stringBehavior = StringBehavior.source;
-					auto tokens = byToken(readFile(f), config, &cache);
+					auto source = readFile(f);
+
+					scope lexer = new Lexer(f.ptr, cast(char*)source.ptr, 0, source.length, false, false, true);
+					auto tokens = lexer.tokenize();
+					// lexer.tokenizeWhitespaces(true);
+					// lexer.nextToken;
+					// TOK[] tokens;
+					// do
+					// {
+					// 	tokens ~= lexer.token.value;
+					// } while (lexer.nextToken != TOK.endOfFile);
+					// LexerConfig config;
+					// config.stringBehavior = StringBehavior.source;
+					// auto tokens = byToken(readFile(f), config, &cache);
+					// auto tokens = byToken(readFile(f), config, &cache);
 					if (tokenCount)
 						count += printTokenCount(stdout, f, tokens);
 					else
