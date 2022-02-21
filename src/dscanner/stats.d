@@ -8,7 +8,8 @@ module dscanner.stats;
 import std.stdio;
 import std.algorithm;
 import dparse.lexer;
-import dmd.tokens;
+import dmd.lexer : Lexer;
+import dmd.tokens : TOK;
 
 pure nothrow bool isLineOfCode(IdType t)
 {
@@ -52,32 +53,25 @@ pure nothrow bool __isLineOfCode(TOK t)
 	}
 }
 
-// ulong printTokenCount(Tokens)(File output, string fileName, ref Tokens tokens)
-ulong printTokenCount(File output, string fileName, ref TOK[] tokens)
+ulong printTokenCount(File output, string fileName, ref Lexer lexer)
 {
-	bool foundWhitespace = false;
+	TOK lastTOK = TOK.reserved;
 	ulong c;
-	foreach (ref t; tokens)
+	foreach (ref t; lexer)
 	{
-		if (!foundWhitespace && t == TOK.whitespace)
-			foundWhitespace = true;
-		else if (t != TOK.whitespace)
-			foundWhitespace = false;
-		else if (foundWhitespace && t == TOK.whitespace)
+		if (lastTOK == TOK.whitespace && t == TOK.whitespace)
 			continue;
-		c++;
-
-		stdout.writeln(dmd.tokens.Token.toString(t));
+		++c;
+		lastTOK = t;
 	}
 	output.writefln("%s:\t%d", fileName, c);
 	return c;
 }
 
-// ulong printLineCount(Tokens)(File output, string fileName, ref Tokens tokens)
-ulong printLineCount(File output, string fileName, ref TOK[] tokens)
+ulong printLineCount(File output, string fileName, ref Lexer lexer)
 {
 	ulong c;
-	foreach (ref t; tokens)
+	foreach (ref t; lexer)
 	{
 		if (__isLineOfCode(t))
 			++c;

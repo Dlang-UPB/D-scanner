@@ -270,59 +270,30 @@ else
 	{
 		if (sloc || tokenCount)
 		{
+			import dmd.lexer;
+			import dmd.tokens;
 			if (usingStdin)
 			{
-				// LexerConfig config;
-				// config.stringBehavior = StringBehavior.source;
-				// auto tokens = byToken(readStdin(), config, &cache);
-
-				import dmd.lexer;
-				import dmd.tokens;
 				auto source = readStdin();
-				scope lexer = new Lexer(null, cast(char*)source.ptr, 0, source.length, false, false, true);
-				// lexer.tokenizeWhitespaces(true);
-				// lexer.nextToken;
-				auto tokens = lexer.tokenize();
-
-				// TOK[] tokens;
-				// do
-				// {
-				// 	tokens ~= lexer.token.value;
-				// } while (lexer.nextToken != TOK.endOfFile);
-
+				Lexer lexer = new Lexer(null, cast(char*) source.ptr, 0, source.length, false, true, true);
 
 				if (tokenCount)
-					printTokenCount(stdout, "stdin", tokens);
+					printTokenCount(stdout, "stdin", lexer);
 				else
-					printLineCount(stdout, "stdin", tokens);
+					printLineCount(stdout, "stdin", lexer);
 			}
 			else
 			{
 				ulong count;
 				foreach (f; expandArgs(args))
 				{
-					import dmd.lexer;
-					import dmd.tokens;
-
 					auto source = readFile(f);
+					Lexer lexer = new Lexer(f.ptr, cast(char*) source.ptr, 0, source.length, false, true, true);
 
-					scope lexer = new Lexer(f.ptr, cast(char*)source.ptr, 0, source.length, false, false, true);
-					auto tokens = lexer.tokenize();
-					// lexer.tokenizeWhitespaces(true);
-					// lexer.nextToken;
-					// TOK[] tokens;
-					// do
-					// {
-					// 	tokens ~= lexer.token.value;
-					// } while (lexer.nextToken != TOK.endOfFile);
-					// LexerConfig config;
-					// config.stringBehavior = StringBehavior.source;
-					// auto tokens = byToken(readFile(f), config, &cache);
-					// auto tokens = byToken(readFile(f), config, &cache);
 					if (tokenCount)
-						count += printTokenCount(stdout, f, tokens);
+						count += printTokenCount(stdout, f, lexer);
 					else
-						count += printLineCount(stdout, f, tokens);
+						count += printLineCount(stdout, f, lexer);
 				}
 				writefln("total:\t%d", count);
 			}
