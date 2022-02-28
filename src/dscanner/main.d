@@ -270,29 +270,33 @@ else
 	{
 		if (sloc || tokenCount)
 		{
+			import dmd.lexer : Lexer;
+			import dmd.tokens : TOK;
+
 			if (usingStdin)
 			{
-				LexerConfig config;
-				config.stringBehavior = StringBehavior.source;
-				auto tokens = byToken(readStdin(), config, &cache);
+				auto source = readStdin();
+				Lexer lexer = new Lexer(null, cast(char*) source.ptr, 0, source.length, false, true, true);
+				lexer.nextToken;
+
 				if (tokenCount)
-					printTokenCount(stdout, "stdin", tokens);
+					printTokenCount(stdout, "stdin", lexer);
 				else
-					printLineCount(stdout, "stdin", tokens);
+					printLineCount(stdout, "stdin", lexer);
 			}
 			else
 			{
 				ulong count;
 				foreach (f; expandArgs(args))
 				{
+					auto source = readFile(f);
+					Lexer lexer = new Lexer(null, cast(char*) source.ptr, 0, source.length, false, true, true);
+					lexer.nextToken;
 
-					LexerConfig config;
-					config.stringBehavior = StringBehavior.source;
-					auto tokens = byToken(readFile(f), config, &cache);
 					if (tokenCount)
-						count += printTokenCount(stdout, f, tokens);
+						count += printTokenCount(stdout, f, lexer);
 					else
-						count += printLineCount(stdout, f, tokens);
+						count += printLineCount(stdout, f, lexer);
 				}
 				writefln("total:\t%d", count);
 			}
