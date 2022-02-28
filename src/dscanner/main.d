@@ -276,6 +276,7 @@ else
 			{
 				auto source = readStdin();
 				Lexer lexer = new Lexer(null, cast(char*) source.ptr, 0, source.length, false, true, true);
+				lexer.nextToken;
 
 				if (tokenCount)
 					printTokenCount(stdout, "stdin", lexer);
@@ -288,7 +289,8 @@ else
 				foreach (f; expandArgs(args))
 				{
 					auto source = readFile(f);
-					Lexer lexer = new Lexer(f.ptr, cast(char*) source.ptr, 0, source.length, false, true, true);
+					Lexer lexer = new Lexer(null, cast(char*) source.ptr, 0, source.length, false, true, true);
+					lexer.nextToken;
 
 					if (tokenCount)
 						count += printTokenCount(stdout, f, lexer);
