@@ -205,21 +205,8 @@ else
 		}
 		else if (tokenDump)
 		{
-			auto tokens = getTokensForParser(bytes, config, &cache);
-			writeln(
-					"text                    \tblank\tindex\tline\tcolumn\ttype\tcomment\ttrailingComment");
-			foreach (token; tokens)
-			{
-				writefln("<<%20s>>\t%b\t%d\t%d\t%d\t%d\t%s\t%s",
-						token.text is null ? str(token.type) : token.text,
-						token.text is null,
-						token.index,
-						token.line,
-						token.column,
-						token.type,
-						token.comment,
-						token.trailingComment);
-			}
+			string fileName = usingStdin ? "stdin" : args[1];
+			printTokenDump(fileName);
 			return 0;
 		}
 	}
@@ -289,6 +276,7 @@ else
 					LexerConfig config;
 					config.stringBehavior = StringBehavior.source;
 					auto tokens = byToken(readFile(f), config, &cache);
+
 					if (tokenCount)
 						count += printTokenCount(stdout, f, tokens);
 					else
