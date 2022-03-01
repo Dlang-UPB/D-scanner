@@ -206,7 +206,7 @@ else
 		else if (tokenDump)
 		{
 			string fileName = usingStdin ? "stdin" : args[1];
-			printTokenDump(fileName);
+			printTokenDump(stdout, bytes);
 			return 0;
 		}
 	}
@@ -276,7 +276,6 @@ else
 					LexerConfig config;
 					config.stringBehavior = StringBehavior.source;
 					auto tokens = byToken(readFile(f), config, &cache);
-
 					if (tokenCount)
 						count += printTokenCount(stdout, f, tokens);
 					else
