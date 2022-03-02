@@ -55,10 +55,8 @@ ulong printLineCount(Tokens)(File output, string fileName, ref Tokens tokens)
 
 void printTokenDump(File output, ubyte[] bytes)
 {
-	import dmd.tokens;
-	import dmd.lexer;
-	import std.file;
-	import std.stdio : writefln;
+	import dmd.tokens : TOK, Token;
+	import dmd.lexer : Lexer;
 
     scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0);
 
@@ -122,7 +120,6 @@ unittest
 {
 	import std.stdio : File;
 	import std.file : exists, remove, readText;
-	import dscanner.utils;
 
 	auto deleteme = "test.txt";
 	File file = File(deleteme, "w");
@@ -132,7 +129,7 @@ unittest
         remove(deleteme);
 	}
 
-	file.write(
+	ubyte[] bytes = cast(ubyte[])
 q{import std.stdio;
 void main(string[] args)
 {
@@ -140,23 +137,12 @@ void main(string[] args)
 	// this is a comment
 	char c = 'd';
 	float x = 1.23;
-}});
+}};
 
+	printTokenDump(file, bytes);
 	file.close();
 
-	auto deleteme2 = "test2.txt";
-	File file2 = File(deleteme2, "w");
-	scope (exit)
-	{
-		assert(exists(deleteme2));
-        remove(deleteme2);
-	}
-
-	ubyte[] bytes = readFile(deleteme);
-	printTokenDump(file2, bytes);
-	file2.close();
-
-	auto actual = readText(deleteme2);
+	auto actual = readText(deleteme);
 	auto expected = "text                    	blank	index	line	column	type	comment	trailingComment
 <<              import>>	1	0	1	1	131		
 <<                 std>>	0	7	1	8	96		
