@@ -272,11 +272,15 @@ else
 		{
 			import dmd.lexer : Lexer;
 			import dmd.tokens : TOK;
+			import std.string : toStringz;
+			import core.stdc.string : strlen;
 
 			if (usingStdin)
 			{
-				auto source = readStdin();
-				Lexer lexer = new Lexer(null, cast(char*) source.ptr, 0, source.length, false, true, true);
+				auto sourceDstr = readStdin();
+				auto sourceCstr = toStringz(cast(char[]) sourceDstr);
+
+				Lexer lexer = new Lexer(null, sourceCstr, 0, strlen(sourceCstr), false, true, true);
 				lexer.nextToken;
 
 				if (tokenCount)
@@ -289,8 +293,10 @@ else
 				ulong count;
 				foreach (f; expandArgs(args))
 				{
-					auto source = readFile(f);
-					Lexer lexer = new Lexer(null, cast(char*) source.ptr, 0, source.length, false, true, true);
+					auto sourceDstr = readFile(f);
+					auto sourceCstr = toStringz(cast(char[]) sourceDstr);
+
+					Lexer lexer = new Lexer(null, cast(char*) sourceCstr, 0, strlen(sourceCstr), false, true, true);
 					lexer.nextToken;
 
 					if (tokenCount)
