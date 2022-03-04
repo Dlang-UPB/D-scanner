@@ -270,29 +270,39 @@ else
 	{
 		if (sloc || tokenCount)
 		{
+			import dmd.lexer : Lexer;
+			import dmd.tokens : TOK;
+			import std.string : toStringz;
+			import core.stdc.string : strlen;
+
 			if (usingStdin)
 			{
-				LexerConfig config;
-				config.stringBehavior = StringBehavior.source;
-				auto tokens = byToken(readStdin(), config, &cache);
+				auto sourceDstr = readStdin();
+				auto sourceCstr = toStringz(cast(char[]) sourceDstr);
+
+				Lexer lexer = new Lexer(null, sourceCstr, 0, strlen(sourceCstr), false, true, true);
+				lexer.nextToken;
+
 				if (tokenCount)
-					printTokenCount(stdout, "stdin", tokens);
+					printTokenCount(stdout, "stdin", lexer);
 				else
-					printLineCount(stdout, "stdin", tokens);
+					printLineCount(stdout, "stdin", lexer);
 			}
 			else
 			{
 				ulong count;
 				foreach (f; expandArgs(args))
 				{
+					auto sourceDstr = readFile(f);
+					auto sourceCstr = toStringz(cast(char[]) sourceDstr);
 
-					LexerConfig config;
-					config.stringBehavior = StringBehavior.source;
-					auto tokens = byToken(readFile(f), config, &cache);
+					Lexer lexer = new Lexer(null, cast(char*) sourceCstr, 0, strlen(sourceCstr), false, true, true);
+					lexer.nextToken;
+
 					if (tokenCount)
-						count += printTokenCount(stdout, f, tokens);
+						count += printTokenCount(stdout, f, lexer);
 					else
-						count += printLineCount(stdout, f, tokens);
+						count += printLineCount(stdout, f, lexer);
 				}
 				writefln("total:\t%d", count);
 			}
