@@ -622,13 +622,11 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 
 MessageSet analyzeDmd(string fileName)
 {
-	import dmd.parse;
-	import dmd.astbase;
-	import dmd.id;
-	import dmd.globals;
-	import dmd.identifier;
-	import std.file : readText;
-	import dscanner.utils;
+	import dmd.parse : Parser;
+	import dmd.astbase : ASTBase;
+	import dmd.id : Id;
+	import dmd.globals : global;
+	import dmd.identifier : Identifier;
 
 	Id.initialize();
 	global._init();
