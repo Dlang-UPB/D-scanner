@@ -5,53 +5,33 @@
 
 module dscanner.analysis.enumarrayliteral;
 
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
-import std.algorithm : canFind, map;
-import dsymbol.scope_ : Scope;
 
-void doNothing(string, size_t, size_t, string, bool)
+extern(C++) class EnumArrayVisitor(AST) : BaseAnalyzerDmd!AST
 {
-}
-
-final class EnumArrayLiteralCheck : BaseAnalyzer
-{
-	alias visit = BaseAnalyzer.visit;
-
 	mixin AnalyzerInfo!"enum_array_literal_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName);
 	}
 
-	bool looking;
+	override void visit(AST.VarDeclaration vd)
+    {
+		import dmd.astenums : STC, InitKind;
+		import std.string : toStringz;
 
-	mixin visitTemplate!ClassDeclaration;
-	mixin visitTemplate!InterfaceDeclaration;
-	mixin visitTemplate!UnionDeclaration;
-	mixin visitTemplate!StructDeclaration;
-
-	override void visit(const AutoDeclaration autoDec)
-	{
-		if (autoDec.storageClasses.canFind!(a => a.token == tok!"enum"))
-		{
-			foreach (part; autoDec.parts)
-			{
-				if (part.initializer is null)
-					continue;
-				if (part.initializer.nonVoidInitializer is null)
-					continue;
-				if (part.initializer.nonVoidInitializer.arrayInitializer is null)
-					continue;
-				addErrorMessage(part.identifier.line, part.identifier.column,
-						"dscanner.performance.enum_array_literal",
-						"This enum may lead to unnecessary allocation at run-time."
+		string message = "This enum may lead to unnecessary allocation at run-time."
 						~ " Use 'static immutable "
-						~ part.identifier.text ~ " = [ ...' instead.");
-			}
-		}
-		autoDec.accept(this);
+						~ vd.ident.toString().idup() ~ " = [ ...' instead.";
+
+		if (!vd.type && vd._init.kind == InitKind.array && vd.storage_class & STC.manifest)
+			addErrorMessage(cast(ulong) vd.loc.linnum,
+				cast(ulong) vd.loc.charnum, KEY,
+				message);
+		super.visit(vd);
 	}
+
+	private enum KEY = "dscanner.performance.enum_array_literal";
 }
