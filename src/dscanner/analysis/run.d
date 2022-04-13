@@ -694,3 +694,14 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	return set;
 }
+MessageSet analyzeDmd(string fileName, ASTBase.Module m)
+{
+	scope vis = new EnumArrayVisitor!ASTBase(fileName);
+	m.accept(vis);
+
+	MessageSet set = new MessageSet;
+	foreach(message; vis.messages)
+		set.insert(message);
+
+	return set;
+}
