@@ -246,8 +246,15 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (errorCount > 0 || (staticAnalyze && warningCount > 0))
 			hasErrors = true;
 		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, staticAnalyze);
+		MessageSet resultsDmd = analyzeDmd(fileName);
 		if (results is null)
 			continue;
+		if (resultsDmd is null)
+			continue;
+		foreach(result; resultsDmd[])
+		{
+			results.insert(result);
+		}
 		foreach (result; results[])
 		{
 			hasErrors = true;
@@ -425,9 +432,9 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new DuplicateAttributeCheck(fileName, moduleScope,
 		analysisConfig.duplicate_attribute == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!EnumArrayLiteralCheck(analysisConfig))
-		checks ~= new EnumArrayLiteralCheck(fileName, moduleScope,
-		analysisConfig.enum_array_literal_check == Check.skipTests && !ut);
+	// if (moduleName.shouldRun!EnumArrayLiteralCheck(analysisConfig))
+	// 	checks ~= new EnumArrayLiteralCheck(fileName, moduleScope,
+	// 	analysisConfig.enum_array_literal_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!PokemonExceptionCheck(analysisConfig))
 		checks ~= new PokemonExceptionCheck(fileName, moduleScope,
@@ -609,6 +616,40 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	}
 
 	GC.enable;
+
+	return set;
+}
+
+MessageSet analyzeDmd(string fileName)
+{
+	import dmd.parse;
+	import dmd.astbase;
+	import dmd.id;
+	import dmd.globals;
+	import dmd.identifier;
+	import std.file : readText;
+	import dscanner.utils;
+
+	Id.initialize();
+	global._init();
+	global.params.useUnitTests = true;
+	ASTBase.Type._init();
+
+	auto id = Identifier.idPool(fileName);
+	auto m = new ASTBase.Module(&(fileName.dup)[0], id, false, false);
+	auto bytes = readFile(fileName);
+	auto input = cast(char[]) bytes;
+	scope p = new Parser!ASTBase(m, input, false);
+	
+	p.nextToken();
+	m.members = p.parseModule();
+
+	scope vis = new EnumArrayVisitor!ASTBase(fileName);
+	m.accept(vis);
+
+	MessageSet set = new MessageSet;
+	foreach(message; vis.messages)
+		set.insert(message);
 
 	return set;
 }

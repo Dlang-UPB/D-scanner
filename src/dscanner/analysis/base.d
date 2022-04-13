@@ -5,6 +5,9 @@ import std.string;
 import dparse.ast;
 import std.array;
 import dsymbol.scope_ : Scope;
+import dmd.transitivevisitor;
+import core.stdc.string;
+import std.conv : to;
 
 struct Message
 {
@@ -97,6 +100,42 @@ protected:
 	string fileName;
 
 	const(Scope)* sc;
+
+	MessageSet _messages;
+}
+
+extern(C++) class BaseAnalyzerDmd(AST) : ParseTimeTransitiveVisitor!AST
+{
+	alias visit = ParseTimeTransitiveVisitor!AST.visit;
+
+	extern(D) this(string fileName)
+	{
+		this.fileName = fileName;
+		_messages = new MessageSet;
+	}
+
+	protected string getName()
+	{
+		assert(0);
+	}
+
+	Message[] messages()
+	{
+		return _messages[].array;
+	}
+
+
+protected:
+
+	extern(D) void addErrorMessage(size_t line, size_t column, string key, string message)
+	{
+		_messages.insert(Message(fileName, line, column, key, message, getName()));
+	}
+
+	/**
+	 * The file name
+	 */
+	string fileName;
 
 	MessageSet _messages;
 }
