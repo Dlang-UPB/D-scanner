@@ -5,6 +5,9 @@ import std.string;
 import dparse.ast;
 import std.array;
 import dsymbol.scope_ : Scope;
+import dmd.transitivevisitor;
+import core.stdc.string;
+import std.conv : to;
 
 struct Message
 {
@@ -26,11 +29,15 @@ enum comparitor = q{ a.line < b.line || (a.line == b.line && a.column < b.column
 
 alias MessageSet = RedBlackTree!(Message, comparitor, true);
 
+/** 
+ * Should be present in all visitors to specify the name of the check
+ *  done by a patricular visitor
+ */
 mixin template AnalyzerInfo(string checkName)
 {
 	enum string name = checkName;
 
-	override protected string getName()
+	extern(D) override protected string getName()
 	{
 		return name;
 	}
@@ -99,4 +106,48 @@ protected:
 	const(Scope)* sc;
 
 	MessageSet _messages;
+}
+
+/** 
+ * Visitor that implements the AST traversal logic.
+ * Supports collecting error messages
+ */
+extern(C++) class BaseAnalyzerDmd(AST) : ParseTimeTransitiveVisitor!AST
+{
+	alias visit = ParseTimeTransitiveVisitor!AST.visit;
+
+	extern(D) this(string fileName)
+	{
+		this.fileName = fileName;
+		_messages = new MessageSet;
+	}
+
+	/** 
+	 * Ensures that template AnalyzerInfo is instantiated in all classes
+	 *  deriving from this class 
+	 */
+	extern(D) protected string getName()
+	{
+		assert(0);
+	}
+
+	extern(D) Message[] messages()
+	{
+		return _messages[].array;
+	}
+
+
+protected:
+
+	extern(D) void addErrorMessage(size_t line, size_t column, string key, string message)
+	{
+		_messages.insert(Message(fileName, line, column, key, message, getName()));
+	}
+
+	/**
+	 * The file name
+	 */
+	extern(D) string fileName;
+
+	extern(D) MessageSet _messages;
 }
