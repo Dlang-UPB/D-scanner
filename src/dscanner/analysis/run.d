@@ -93,6 +93,8 @@ import dsymbol.modulecache : ModuleCache;
 import dscanner.utils;
 import dscanner.reports : DScannerJsonReporter, SonarQubeGenericIssueDataReporter;
 
+import dmd.astbase : ASTBase;
+
 bool first = true;
 
 private alias ASTAllocator = CAllocatorImpl!(
@@ -229,10 +231,32 @@ void generateSonarQubeGenericIssueDataReport(string[] fileNames, const StaticAna
 bool analyze(string[] fileNames, const StaticAnalysisConfig config, string errorFormat,
 		ref StringCache cache, ref ModuleCache moduleCache, bool staticAnalyze = true)
 {
+	import dmd.parse : Parser;
+	import dmd.astbase : ASTBase;
+	import dmd.id : Id;
+	import dmd.globals : global;
+	import dmd.identifier : Identifier;
+	import std.string : toStringz;
+
+	Id.initialize();
+	global._init();
+	global.params.useUnitTests = true;
+	ASTBase.Type._init();
+
+
 	bool hasErrors;
 	foreach (fileName; fileNames)
 	{
 		auto code = readFile(fileName);
+
+		auto id = Identifier.idPool(fileName);
+		auto ast_m = new ASTBase.Module(fileName.toStringz, id, false, false);
+		auto input = cast(char[]) code;
+		input ~= '\0';
+		scope p = new Parser!ASTBase(ast_m, input, false);
+		p.nextToken();
+		ast_m.members = p.parseModule();
+
 		// Skip files that could not be read and continue with the rest
 		if (code.length == 0)
 			continue;
@@ -246,15 +270,13 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (errorCount > 0 || (staticAnalyze && warningCount > 0))
 			hasErrors = true;
 		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, staticAnalyze);
-		MessageSet resultsDmd = analyzeDmd(fileName);
-		if (results is null)
-			continue;
-		if (resultsDmd is null)
-			continue;
+		MessageSet resultsDmd = analyzeDmd(fileName, ast_m);
 		foreach(result; resultsDmd[])
 		{
 			results.insert(result);
 		}
+		if (results is null)
+			continue;
 		foreach (result; results[])
 		{
 			hasErrors = true;
@@ -431,10 +453,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	if (moduleName.shouldRun!DuplicateAttributeCheck(analysisConfig))
 		checks ~= new DuplicateAttributeCheck(fileName, moduleScope,
 		analysisConfig.duplicate_attribute == Check.skipTests && !ut);
-
-	// if (moduleName.shouldRun!EnumArrayLiteralCheck(analysisConfig))
-	// 	checks ~= new EnumArrayLiteralCheck(fileName, moduleScope,
-	// 	analysisConfig.enum_array_literal_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!PokemonExceptionCheck(analysisConfig))
 		checks ~= new PokemonExceptionCheck(fileName, moduleScope,
@@ -620,28 +638,8 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	return set;
 }
 
-MessageSet analyzeDmd(string fileName)
+MessageSet analyzeDmd(string fileName, ASTBase.Module m)
 {
-	import dmd.parse : Parser;
-	import dmd.astbase : ASTBase;
-	import dmd.id : Id;
-	import dmd.globals : global;
-	import dmd.identifier : Identifier;
-
-	Id.initialize();
-	global._init();
-	global.params.useUnitTests = true;
-	ASTBase.Type._init();
-
-	auto id = Identifier.idPool(fileName);
-	auto m = new ASTBase.Module(&(fileName.dup)[0], id, false, false);
-	auto bytes = readFile(fileName);
-	auto input = cast(char[]) bytes;
-	scope p = new Parser!ASTBase(m, input, false);
-	
-	p.nextToken();
-	m.members = p.parseModule();
-
 	scope vis = new EnumArrayVisitor!ASTBase(fileName);
 	m.accept(vis);
 

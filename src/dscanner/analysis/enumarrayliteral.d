@@ -19,7 +19,7 @@ extern(C++) class EnumArrayVisitor(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.VarDeclaration vd)
     {
-		import dmd.astenums;
+		import dmd.astenums : STC, InitKind;
 		import std.string : toStringz;
 
 		string message = "This enum may lead to unnecessary allocation at run-time."
@@ -30,6 +30,7 @@ extern(C++) class EnumArrayVisitor(AST) : BaseAnalyzerDmd!AST
 			addErrorMessage(cast(ulong) vd.loc.linnum,
 				cast(ulong) vd.loc.charnum, KEY,
 				message);
+		super.visit(vd);
 	}
 
 	private enum KEY = "dscanner.performance.enum_array_literal";
