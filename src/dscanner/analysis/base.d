@@ -114,12 +114,12 @@ extern(C++) class BaseAnalyzerDmd(AST) : ParseTimeTransitiveVisitor!AST
 		_messages = new MessageSet;
 	}
 
-	protected string getName()
+	extern(D) protected string getName()
 	{
 		assert(0);
 	}
 
-	Message[] messages()
+	extern(D) Message[] messages()
 	{
 		return _messages[].array;
 	}
@@ -135,7 +135,7 @@ protected:
 	/**
 	 * The file name
 	 */
-	string fileName;
+	extern(D) string fileName;
 
-	MessageSet _messages;
+	extern(D) MessageSet _messages;
 }
