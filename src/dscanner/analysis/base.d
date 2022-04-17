@@ -33,7 +33,7 @@ mixin template AnalyzerInfo(string checkName)
 {
 	enum string name = checkName;
 
-	override protected string getName()
+	extern(D) override protected string getName()
 	{
 		return name;
 	}
