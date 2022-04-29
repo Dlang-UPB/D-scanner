@@ -73,7 +73,7 @@ INCLUDE_PATHS = \
 	-Istdx-allocator/source \
 	-Idmd/src
 
-DMD_VERSIONS = -version=StdLoggerDisableWarning -version=CallbackAPI -version=DMDLIB
+DMD_VERSIONS = -version=StdLoggerDisableWarning -version=CallbackAPI -version=DMDLIB -version=MARS
 DMD_DEBUG_VERSIONS = -version=dparse_verbose
 LDC_VERSIONS = -d-version=StdLoggerDisableWarning -d-version=CallbackAPI -d-version=DMDLIB
 LDC_DEBUG_VERSIONS = -d-version=dparse_verbose
@@ -81,7 +81,7 @@ GDC_VERSIONS = -fversion=StdLoggerDisableWarning -fversion=CallbackAPI -fversion
 GDC_DEBUG_VERSIONS = -fversion=dparse_verbose
 
 DC_FLAGS += -Jbin -Jdmd
-override DMD_FLAGS += $(DFLAGS) -w -release -O -od${OBJ_DIR}
+override DMD_FLAGS += $(DFLAGS) -g -w -release -O -od${OBJ_DIR}
 override LDC_FLAGS += $(DFLAGS) -O5 -release -oq
 override GDC_FLAGS += $(DFLAGS) -O3 -frelease
 
