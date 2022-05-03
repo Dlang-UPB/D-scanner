@@ -29,6 +29,10 @@ enum comparitor = q{ a.line < b.line || (a.line == b.line && a.column < b.column
 
 alias MessageSet = RedBlackTree!(Message, comparitor, true);
 
+/** 
+ * Should be present in all visitors to specify the name of the check
+ *  done by a patricular visitor
+ */
 mixin template AnalyzerInfo(string checkName)
 {
 	enum string name = checkName;
@@ -104,6 +108,10 @@ protected:
 	MessageSet _messages;
 }
 
+/** 
+ * Visitor that implements the AST traversal logic.
+ * Supports collecting error messages
+ */
 extern(C++) class BaseAnalyzerDmd(AST) : ParseTimeTransitiveVisitor!AST
 {
 	alias visit = ParseTimeTransitiveVisitor!AST.visit;
@@ -114,6 +122,10 @@ extern(C++) class BaseAnalyzerDmd(AST) : ParseTimeTransitiveVisitor!AST
 		_messages = new MessageSet;
 	}
 
+	/** 
+	 * Ensures that template AnalyzerInfo is instantiated in all classes
+	 *  deriving from this class 
+	 */
 	extern(D) protected string getName()
 	{
 		assert(0);
