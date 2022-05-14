@@ -256,6 +256,20 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		scope p = new Parser!ASTBase(ast_m, input, false);
 		p.nextToken();
 		ast_m.members = p.parseModule();
+		string moduleName;
+		if (p.md !is null)
+		{
+			import std.algorithm : map;
+			ASTBase.ModuleDeclaration md = *p.md;
+			
+			if (md.packages.length != 0)
+			{
+				moduleName = md.packages.map!(e => e.toString()).join(".").dup;
+				moduleName ~= "." ~ md.id.toString().dup;
+			}
+			else
+				moduleName = md.id.toString().dup; 
+		}
 
 		// Skip files that could not be read and continue with the rest
 		if (code.length == 0)
@@ -270,8 +284,8 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (errorCount > 0 || (staticAnalyze && warningCount > 0))
 			hasErrors = true;
 		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, staticAnalyze);
-		MessageSet resultsDmd = analyzeDmd(fileName, ast_m);
-		foreach(result; resultsDmd[])
+		MessageSet resultsDmd = analyzeDmd(fileName, ast_m, moduleName, config);
+		foreach (result; resultsDmd[])
 		{
 			results.insert(result);
 		}
@@ -323,6 +337,38 @@ either a '+' (inclusion) or '-' (exclusion).
 If no includes are specified, all modules are included.
 */
 bool shouldRun(check : BaseAnalyzer)(string moduleName, const ref StaticAnalysisConfig config)
+{
+	enum string a = check.name;
+
+	if (mixin("config." ~ a) == Check.disabled)
+		return false;
+
+	// By default, run the check
+	if (!moduleName.length)
+		return true;
+
+	auto filters = mixin("config.filters." ~ a);
+
+	// Check if there are filters are defined
+	// filters starting with a comma are invalid
+	if (filters.length == 0 || filters[0].length == 0)
+		return true;
+
+	auto includers = filters.filter!(f => f[0] == '+').map!(f => f[1..$]);
+	auto excluders = filters.filter!(f => f[0] == '-').map!(f => f[1..$]);
+
+	// exclusion has preference over inclusion
+	if (!excluders.empty && excluders.any!(s => moduleName.canFind(s)))
+		return false;
+
+	if (!includers.empty)
+		return includers.any!(s => moduleName.canFind(s));
+
+	// by default: include all modules
+	return true;
+}
+
+bool shouldRunDmd(check : BaseAnalyzerDmd!ASTBase)(string moduleName, const ref StaticAnalysisConfig config)
 {
 	enum string a = check.name;
 
@@ -494,10 +540,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new NumberStyleCheck(fileName, moduleScope,
 		analysisConfig.number_style_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!ObjectConstCheck(analysisConfig))
-		checks ~= new ObjectConstCheck(fileName, moduleScope,
-		analysisConfig.object_const_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!OpEqualsWithoutToHashCheck(analysisConfig))
 		checks ~= new OpEqualsWithoutToHashCheck(fileName, moduleScope,
 		analysisConfig.opequals_tohash_check == Check.skipTests && !ut);
@@ -638,14 +680,24 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	return set;
 }
 
-MessageSet analyzeDmd(string fileName, ASTBase.Module m)
+MessageSet analyzeDmd(string fileName, ASTBase.Module m, string moduleName, const StaticAnalysisConfig config)
 {
-	scope vis = new EnumArrayVisitor!ASTBase(fileName);
-	m.accept(vis);
-
 	MessageSet set = new MessageSet;
-	foreach(message; vis.messages)
-		set.insert(message);
+	BaseAnalyzerDmd!ASTBase[] visitors;
+
+	if (moduleName.shouldRunDmd!(ObjectConstCheck!ASTBase)(config))
+		visitors ~= new ObjectConstCheck!ASTBase(fileName);
+
+	if (moduleName.shouldRunDmd!(EnumArrayVisitor!ASTBase)(config))
+		visitors ~= new EnumArrayVisitor!ASTBase(fileName);
+
+	foreach (visitor; visitors)
+	{
+		m.accept(visitor);
+		
+		foreach (message; visitor.messages)
+			set.insert(message);
+	}
 
 	return set;
 }

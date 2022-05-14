@@ -5,100 +5,57 @@
 
 module dscanner.analysis.objectconst;
 
-import std.stdio;
-import std.regex;
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
-import dsymbol.scope_ : Scope;
+import std.stdio;
 
-/**
- * Checks that opEquals, opCmp, toHash, 'opCast', and toString are either const,
- * immutable, or inout.
- */
-final class ObjectConstCheck : BaseAnalyzer
+extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 {
-	alias visit = BaseAnalyzer.visit;
-
 	mixin AnalyzerInfo!"object_const_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	///
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, sc, skipTests);
+		this.inConstBlock = false;
+		super(fileName);
 	}
 
-	mixin visitTemplate!ClassDeclaration;
-	mixin visitTemplate!InterfaceDeclaration;
-	mixin visitTemplate!UnionDeclaration;
-	mixin visitTemplate!StructDeclaration;
-
-	override void visit(const AttributeDeclaration d)
+	override void visit(AST.StorageClassDeclaration scd)
 	{
-		if (d.attribute.attribute == tok!"const" && inAggregate)
+		import dmd.astenums : STC;
+
+		if (scd.stc & STC.const_ || scd.stc & STC.immutable_ || scd.stc & STC.wild)
+			inConstBlock = true;
+
+		foreach(de; *scd.decl)
 		{
-			constColon = true;
+			de.accept(this);
 		}
-		d.accept(this);
+
+		inConstBlock = false;
 	}
 
-	override void visit(const Declaration d)
-	{
-		import std.algorithm : any;
-		bool setConstBlock;
-		if (inAggregate && d.attributes && d.attributes.any!(a => a.attribute == tok!"const"))
-		{
-			setConstBlock = true;
-			constBlock = true;
-		}
+	override void visit(AST.FuncDeclaration ed)
+    {
+		import dmd.astenums : MODFlags, STC;
 
-		bool containsDisable(A)(const A[] attribs)
-		{
-			import std.algorithm.searching : canFind;
-			return attribs.canFind!(a => a.atAttribute !is null &&
-				a.atAttribute.identifier.text == "disable");
-		}
-
-		if (const FunctionDeclaration fd = d.functionDeclaration)
-		{
-			const isDeclationDisabled = containsDisable(d.attributes) ||
-				containsDisable(fd.memberFunctionAttributes);
-
-			if (inAggregate && !constColon && !constBlock && !isDeclationDisabled
-					&& isInteresting(fd.name.text) && !hasConst(fd.memberFunctionAttributes))
-			{
-				addErrorMessage(d.functionDeclaration.name.line,
-						d.functionDeclaration.name.column, "dscanner.suspicious.object_const",
+		if (!ed.type.mod == MODFlags.const_ && isInteresting(ed.ident.toString()) && 
+			!inConstBlock && !(ed.storage_class & STC.disable))
+				addErrorMessage(cast(ulong) ed.loc.linnum, cast(ulong) ed.loc.charnum, KEY,
 						"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
-			}
-		}
+		
+		super.visit(ed);
 
-		d.accept(this);
-
-		if (!inAggregate)
-			constColon = false;
-		if (setConstBlock)
-			constBlock = false;
 	}
 
-	private static bool hasConst(const MemberFunctionAttribute[] attributes)
-	{
-		import std.algorithm : any;
-
-		return attributes.any!(a => a.tokenType == tok!"const"
-				|| a.tokenType == tok!"immutable" || a.tokenType == tok!"inout");
-	}
-
-	private static bool isInteresting(string name)
+	extern(D) private static bool isInteresting(const char[] name)
 	{
 		return name == "opCmp" || name == "toHash" || name == "opEquals"
 			|| name == "toString" || name == "opCast";
 	}
 
-	private bool constBlock;
-	private bool constColon;
-
+	private bool inConstBlock;
+	private enum KEY = "dscanner.suspicious.object_const";
 }
 
 unittest
@@ -107,7 +64,7 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.object_const_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testConsts()
 		{
 			// Will be ok because all are declared const/immutable
@@ -123,7 +80,7 @@ unittest
 					return 1;
 				}
 
-				const hash_t toHash() // ok
+				immutable hash_t toHash() // ok
 				{
 					return 0;
 				}
@@ -141,7 +98,7 @@ unittest
 
 			class Fox
 			{
-				const{ override string toString() { return "foo"; }} // ok
+				inout { override string toString() { return "foo"; } } // ok
 			}
 
 			class Rat
