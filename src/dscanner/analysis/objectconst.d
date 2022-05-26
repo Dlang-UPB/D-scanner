@@ -14,6 +14,39 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 	mixin AnalyzerInfo!"object_const_check";
 	alias visit = BaseAnalyzerDmd!AST.visit;
 
+	// mixin visitTemplate!AST.ClassDeclaration;
+	// mixin visitTemplate!AST.InterfaceDeclaration;
+	// mixin visitTemplate!AST.UnionDeclaration;
+	// mixin visitTemplate!AST.StructDeclaration;
+
+	override void visit(AST.ClassDeclaration cd)
+	{
+		inAggregate = true;
+		super.visit(cd);
+		inAggregate = false;
+	}
+
+	override void visit(AST.InterfaceDeclaration cd)
+	{
+		inAggregate = true;
+		super.visit(cd);
+		inAggregate = false;
+	}
+
+	override void visit(AST.UnionDeclaration cd)
+	{
+		inAggregate = true;
+		super.visit(cd);
+		inAggregate = false;
+	}
+
+	override void visit(AST.StructDeclaration cd)
+	{
+		inAggregate = true;
+		super.visit(cd);
+		inAggregate = false;
+	}
+
 	extern(D) this(string fileName)
 	{
 		this.inConstBlock = false;
@@ -40,7 +73,7 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 		import dmd.astenums : MODFlags, STC;
 
 		if (!ed.type.mod == MODFlags.const_ && isInteresting(ed.ident.toString()) && 
-			!inConstBlock && !(ed.storage_class & STC.disable))
+			inAggregate && !inConstBlock && !(ed.storage_class & STC.disable))
 				addErrorMessage(cast(ulong) ed.loc.linnum, cast(ulong) ed.loc.charnum, KEY,
 						"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
 		
