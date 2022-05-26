@@ -14,38 +14,10 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 	mixin AnalyzerInfo!"object_const_check";
 	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	// mixin visitTemplate!AST.ClassDeclaration;
-	// mixin visitTemplate!AST.InterfaceDeclaration;
-	// mixin visitTemplate!AST.UnionDeclaration;
-	// mixin visitTemplate!AST.StructDeclaration;
-
-	override void visit(AST.ClassDeclaration cd)
-	{
-		inAggregate = true;
-		super.visit(cd);
-		inAggregate = false;
-	}
-
-	override void visit(AST.InterfaceDeclaration cd)
-	{
-		inAggregate = true;
-		super.visit(cd);
-		inAggregate = false;
-	}
-
-	override void visit(AST.UnionDeclaration cd)
-	{
-		inAggregate = true;
-		super.visit(cd);
-		inAggregate = false;
-	}
-
-	override void visit(AST.StructDeclaration cd)
-	{
-		inAggregate = true;
-		super.visit(cd);
-		inAggregate = false;
-	}
+	mixin visitTemplate!(AST.ClassDeclaration);
+	mixin visitTemplate!(AST.InterfaceDeclaration);
+	mixin visitTemplate!(AST.UnionDeclaration);
+	mixin visitTemplate!(AST.StructDeclaration);
 
 	extern(D) this(string fileName)
 	{
