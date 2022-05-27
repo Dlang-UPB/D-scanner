@@ -14,43 +14,67 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 	mixin AnalyzerInfo!"object_const_check";
 	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	mixin visitTemplate!(AST.ClassDeclaration);
-	mixin visitTemplate!(AST.InterfaceDeclaration);
-	mixin visitTemplate!(AST.UnionDeclaration);
-	mixin visitTemplate!(AST.StructDeclaration);
-
 	extern(D) this(string fileName)
 	{
-		this.inConstBlock = false;
 		super(fileName);
 	}
 
-	override void visit(AST.StorageClassDeclaration scd)
+	void visitAggregate(AST.AggregateDeclaration ad)
 	{
-		import dmd.astenums : STC;
-
-		if (scd.stc & STC.const_ || scd.stc & STC.immutable_ || scd.stc & STC.wild)
-			inConstBlock = true;
-
-		foreach(de; *scd.decl)
-		{
-			de.accept(this);
-		}
-
-		inConstBlock = false;
-	}
-
-	override void visit(AST.FuncDeclaration ed)
-    {
 		import dmd.astenums : MODFlags, STC;
 
-		if (!ed.type.mod == MODFlags.const_ && isInteresting(ed.ident.toString()) && 
-			inAggregate && !inConstBlock && !(ed.storage_class & STC.disable))
-				addErrorMessage(cast(ulong) ed.loc.linnum, cast(ulong) ed.loc.charnum, KEY,
-						"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
-		
-		super.visit(ed);
+		foreach(member; *ad.members)
+		{
+			if (auto fd = member.isFuncDeclaration())
+			{
+				if (!fd.type.mod == MODFlags.const_ && isInteresting(fd.ident.toString()) && 
+					!(fd.storage_class & STC.disable))
+						addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
+							"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
+				
+				super.visit(fd);
+			}
+			else if (auto scd = member.isStorageClassDeclaration())
+			{
+				foreach (smember; *scd.decl)
+				{
+					if (auto fd2 = smember.isFuncDeclaration())
+					{
+						if (!fd2.type.mod == MODFlags.const_ && isInteresting(fd2.ident.toString()) && 
+							!(fd2.storage_class & STC.disable) && !(scd.stc & STC.const_ ||
+							scd.stc & STC.immutable_ || scd.stc & STC.wild))
+								addErrorMessage(cast(ulong) fd2.loc.linnum, cast(ulong) fd2.loc.charnum, KEY,
+									"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
+						
+						super.visit(fd2);
+					}
+					else
+						smember.accept(this);
+				}
+			}
+			else
+				member.accept(this);
+		}
+	}
 
+	override void visit(AST.ClassDeclaration cd)
+	{
+		visitAggregate(cd);	
+	}
+
+	override void visit(AST.StructDeclaration sd)
+	{
+		visitAggregate(sd);
+	}
+
+	override void visit(AST.InterfaceDeclaration id)
+	{
+		visitAggregate(id);
+	}
+
+	override void visit(AST.UnionDeclaration ud)
+	{
+		visitAggregate(ud);
 	}
 
 	extern(D) private static bool isInteresting(const char[] name)
@@ -59,7 +83,6 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 			|| name == "toString" || name == "opCast";
 	}
 
-	private bool inConstBlock;
 	private enum KEY = "dscanner.suspicious.object_const";
 }
 
