@@ -23,16 +23,19 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 	{
 		import dmd.astenums : MODFlags, STC;
 
+		if (!ad.members)
+			return;
+
 		foreach(member; *ad.members)
 		{
 			if (auto fd = member.isFuncDeclaration())
 			{
-				if (!fd.type.mod == MODFlags.const_ && isInteresting(fd.ident.toString()) && 
+				if (fd.type && !fd.type.mod == MODFlags.const_ && isInteresting(fd.ident.toString()) && 
 					!(fd.storage_class & STC.disable))
 						addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
 							"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
 				
-				super.visit(fd);
+				member.accept(this);
 			}
 			else if (auto scd = member.isStorageClassDeclaration())
 			{
@@ -40,13 +43,13 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 				{
 					if (auto fd2 = smember.isFuncDeclaration())
 					{
-						if (!fd2.type.mod == MODFlags.const_ && isInteresting(fd2.ident.toString()) && 
+						if (fd2.type && !fd2.type.mod == MODFlags.const_ && isInteresting(fd2.ident.toString()) && 
 							!(fd2.storage_class & STC.disable) && !(scd.stc & STC.const_ ||
 							scd.stc & STC.immutable_ || scd.stc & STC.wild))
 								addErrorMessage(cast(ulong) fd2.loc.linnum, cast(ulong) fd2.loc.charnum, KEY,
 									"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
 						
-						super.visit(fd2);
+						smember.accept(this);
 					}
 					else
 						smember.accept(this);
@@ -59,6 +62,7 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.ClassDeclaration cd)
 	{
+		visitBaseClasses(cd);
 		visitAggregate(cd);	
 	}
 
