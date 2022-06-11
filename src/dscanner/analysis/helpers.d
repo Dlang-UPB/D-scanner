@@ -136,3 +136,120 @@ void assertAnalyzerWarnings(string code, const StaticAnalysisConfig config,
 		throw new AssertError(message, file, line);
 	}
 }
+
+void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
+		string file = __FILE__, size_t line = __LINE__)
+{
+	import dmd.parse : Parser;
+	import dmd.astbase : ASTBase;
+	import dmd.id : Id;
+	import dmd.globals : global;
+	import dmd.identifier : Identifier;
+	import std.string : toStringz;
+
+	Id.initialize();
+	global._init();
+	global.params.useUnitTests = true;
+	ASTBase.Type._init();
+
+	auto id = Identifier.idPool(file);
+	auto ast_m = new ASTBase.Module(file.toStringz, id, false, false);
+	char[] input = code.dup;
+	input ~= '\0';
+	scope p = new Parser!ASTBase(ast_m, input, false);
+	p.nextToken();
+	ast_m.members = p.parseModule();
+
+	string moduleName;
+	if (p.md !is null)
+	{
+		import std.algorithm : map;
+		ASTBase.ModuleDeclaration md = *p.md;
+		
+		if (md.packages.length != 0)
+		{
+			moduleName = md.packages.map!(e => e.toString()).join(".").dup;
+			moduleName ~= "." ~ md.id.toString().dup;
+		}
+		else
+			moduleName = md.id.toString().dup; 
+	}
+
+	MessageSet rawWarnings = analyzeDmd("test", ast_m, moduleName, config);
+
+	string[] codeLines = code.splitLines();
+
+	// Get the warnings ordered by line
+	string[size_t] warnings;
+	foreach (rawWarning; rawWarnings[])
+	{
+		// Skip the warning if it is on line zero
+		immutable size_t rawLine = rawWarning.line;
+		if (rawLine == 0)
+		{
+			stderr.writefln("!!! Skipping warning because it is on line zero:\n%s",
+					rawWarning.message);
+			continue;
+		}
+
+		size_t warnLine = line - 1 + rawLine;
+		warnings[warnLine] = format("[warn]: %s", rawWarning.message);
+	}
+
+	// Get all the messages from the comments in the code
+	string[size_t] messages;
+	foreach (i, codeLine; codeLines)
+	{
+		// Skip if no [warn] comment
+		if (codeLine.indexOf("// [warn]:") == -1)
+			continue;
+
+		// Skip if there is no comment or code
+		immutable string codePart = codeLine.before("// ");
+		immutable string commentPart = codeLine.after("// ");
+		if (!codePart.length || !commentPart.length)
+			continue;
+
+		// Get the line of this code line
+		size_t lineNo = i + line;
+
+		// Get the message
+		messages[lineNo] = commentPart;
+	}
+
+	// Throw an assert error if any messages are not listed in the warnings
+	foreach (lineNo, message; messages)
+	{
+		// No warning
+		if (lineNo !in warnings)
+		{
+			immutable string errors = "Expected warning:\n%s\nFrom source code at (%s:?):\n%s".format(messages[lineNo],
+					lineNo, codeLines[lineNo - line]);
+			throw new AssertError(errors, file, lineNo);
+		}
+		// Different warning
+		else if (warnings[lineNo] != messages[lineNo])
+		{
+			immutable string errors = "Expected warning:\n%s\nBut was:\n%s\nFrom source code at (%s:?):\n%s".format(
+					messages[lineNo], warnings[lineNo], lineNo, codeLines[lineNo - line]);
+			throw new AssertError(errors, file, lineNo);
+		}
+	}
+
+	// Throw an assert error if there were any warnings that were not expected
+	string[] unexpectedWarnings;
+	foreach (lineNo, warning; warnings)
+	{
+		// Unexpected warning
+		if (lineNo !in messages)
+		{
+			unexpectedWarnings ~= "%s\nFrom source code at (%s:?):\n%s".format(warning,
+					lineNo, codeLines[lineNo - line]);
+		}
+	}
+	if (unexpectedWarnings.length)
+	{
+		immutable string message = "Unexpected warnings:\n" ~ unexpectedWarnings.join("\n");
+		throw new AssertError(message, file, line);
+	}
+}
