@@ -12,7 +12,6 @@ import std.array;
 import std.conv;
 import std.algorithm;
 import std.range;
-import std.array;
 import std.functional : toDelegate;
 import std.file : mkdirRecurse;
 import std.path : dirName;
@@ -94,6 +93,7 @@ import dscanner.utils;
 import dscanner.reports : DScannerJsonReporter, SonarQubeGenericIssueDataReporter;
 
 import dmd.astbase : ASTBase;
+import dmd.parse : Parser;
 
 bool first = true;
 
@@ -253,23 +253,9 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		auto ast_m = new ASTBase.Module(fileName.toStringz, id, false, false);
 		auto input = cast(char[]) code;
 		input ~= '\0';
-		scope p = new Parser!ASTBase(ast_m, input, false);
-		p.nextToken();
-		ast_m.members = p.parseModule();
-		string moduleName;
-		if (p.md !is null)
-		{
-			import std.algorithm : map;
-			ASTBase.ModuleDeclaration md = *p.md;
-			
-			if (md.packages.length != 0)
-			{
-				moduleName = md.packages.map!(e => e.toString()).join(".").dup;
-				moduleName ~= "." ~ md.id.toString().dup;
-			}
-			else
-				moduleName = md.id.toString().dup; 
-		}
+		scope astbaseParser = new Parser!ASTBase(ast_m, input, false);
+		astbaseParser.nextToken();
+		ast_m.members = astbaseParser.parseModule();
 
 		// Skip files that could not be read and continue with the rest
 		if (code.length == 0)
@@ -284,7 +270,7 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (errorCount > 0 || (staticAnalyze && warningCount > 0))
 			hasErrors = true;
 		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, staticAnalyze);
-		MessageSet resultsDmd = analyzeDmd(fileName, ast_m, moduleName, config);
+		MessageSet resultsDmd = analyzeDmd(fileName, ast_m, getModuleName(astbaseParser), config);
 		foreach (result; resultsDmd[])
 		{
 			results.insert(result);
@@ -368,7 +354,15 @@ bool shouldRun(check : BaseAnalyzer)(string moduleName, const ref StaticAnalysis
 	return true;
 }
 
-bool shouldRunDmd(check : BaseAnalyzerDmd!ASTBase)(string moduleName, const ref StaticAnalysisConfig config)
+/**
+ * Checks whether a module is part of a user-specified include/exclude list.
+ *
+ * The user can specify a comma-separated list of filters, everyone needs to start with
+ * either a '+' (inclusion) or '-' (exclusion).
+ *
+ * If no includes are specified, all modules are included.
+*/
+bool shouldRunDmd(check : BaseAnalyzerDmd!ASTBase)(const char[] moduleName, const ref StaticAnalysisConfig config)
 {
 	enum string a = check.name;
 
@@ -680,7 +674,7 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	return set;
 }
 
-MessageSet analyzeDmd(string fileName, ASTBase.Module m, string moduleName, const StaticAnalysisConfig config)
+MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName, const StaticAnalysisConfig config)
 {
 	MessageSet set = new MessageSet;
 	BaseAnalyzerDmd!ASTBase[] visitors;

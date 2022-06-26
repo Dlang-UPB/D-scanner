@@ -139,21 +139,9 @@ extern(C++) class BaseAnalyzerDmd(AST) : ParseTimeTransitiveVisitor!AST
 
 protected:
 
-	bool inAggregate;
-
 	extern(D) void addErrorMessage(size_t line, size_t column, string key, string message)
 	{
 		_messages.insert(Message(fileName, line, column, key, message, getName()));
-	}
-
-	template visitTemplate(T)
-	{
-		override void visit(T structDec)
-		{
-			inAggregate = true;
-			super.visit(structDec);
-			inAggregate = false;
-		}
 	}
 
 	/**

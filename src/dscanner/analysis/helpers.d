@@ -19,6 +19,9 @@ import dscanner.analysis.base;
 import stdx.allocator.mallocator;
 import stdx.allocator;
 
+import dmd.parse : Parser;
+import dmd.astbase : ASTBase;
+
 S between(S)(S value, S before, S after) if (isSomeString!S)
 {
 	return value.after(before).before(after);
@@ -146,6 +149,7 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 	import dmd.globals : global;
 	import dmd.identifier : Identifier;
 	import std.string : toStringz;
+	import dscanner.utils : getModuleName;
 
 	Id.initialize();
 	global._init();
@@ -156,26 +160,10 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 	auto ast_m = new ASTBase.Module(file.toStringz, id, false, false);
 	char[] input = code.dup;
 	input ~= '\0';
-	scope p = new Parser!ASTBase(ast_m, input, false);
-	p.nextToken();
-	ast_m.members = p.parseModule();
-
-	string moduleName;
-	if (p.md !is null)
-	{
-		import std.algorithm : map;
-		ASTBase.ModuleDeclaration md = *p.md;
-		
-		if (md.packages.length != 0)
-		{
-			moduleName = md.packages.map!(e => e.toString()).join(".").dup;
-			moduleName ~= "." ~ md.id.toString().dup;
-		}
-		else
-			moduleName = md.id.toString().dup; 
-	}
-
-	MessageSet rawWarnings = analyzeDmd("test", ast_m, moduleName, config);
+	scope astbaseParser = new Parser!ASTBase(ast_m, input, false);
+	astbaseParser.nextToken();
+	ast_m.members = astbaseParser.parseModule();
+	MessageSet rawWarnings = analyzeDmd("test", ast_m, getModuleName(astbaseParser), config);
 
 	string[] codeLines = code.splitLines();
 

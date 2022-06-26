@@ -30,7 +30,7 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 		{
 			if (auto fd = member.isFuncDeclaration())
 			{
-				if (fd.type && !fd.type.mod == MODFlags.const_ && isInteresting(fd.ident.toString()) && 
+				if (isInteresting(fd.ident.toString()) && !isConstFunc(fd) &&
 					!(fd.storage_class & STC.disable))
 						addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
 							"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
@@ -43,9 +43,8 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 				{
 					if (auto fd2 = smember.isFuncDeclaration())
 					{
-						if (fd2.type && !fd2.type.mod == MODFlags.const_ && isInteresting(fd2.ident.toString()) && 
-							!(fd2.storage_class & STC.disable) && !(scd.stc & STC.const_ ||
-							scd.stc & STC.immutable_ || scd.stc & STC.wild))
+						if (isInteresting(fd2.ident.toString()) && !isConstFunc(fd2, scd) &&
+							!(fd2.storage_class & STC.disable))
 								addErrorMessage(cast(ulong) fd2.loc.linnum, cast(ulong) fd2.loc.charnum, KEY,
 									"Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const.");
 						
@@ -62,7 +61,6 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.ClassDeclaration cd)
 	{
-		visitBaseClasses(cd);
 		visitAggregate(cd);	
 	}
 
@@ -85,6 +83,24 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 	{
 		return name == "opCmp" || name == "toHash" || name == "opEquals"
 			|| name == "toString" || name == "opCast";
+	}
+
+	/**
+	 * Checks if a function has either one of attributes `const`, `immutable`, `inout`
+	 */
+	private bool isConstFunc(AST.FuncDeclaration fd, AST.StorageClassDeclaration scd = null)
+	{
+		import dmd.astenums : MODFlags, STC;
+		import std.stdio : writeln;
+
+		if (scd && (scd.stc & STC.const_ || scd.stc & STC.immutable_ || scd.stc & STC.wild))
+			return true;
+
+		if(fd.type && (fd.type.mod == MODFlags.const_ ||
+			fd.type.mod == MODFlags.immutable_ || fd.type.mod == MODFlags.wild))
+				return true;
+
+		return false; 
 	}
 
 	private enum KEY = "dscanner.suspicious.object_const";
