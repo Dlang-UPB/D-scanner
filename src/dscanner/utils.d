@@ -249,16 +249,16 @@ auto ref safeAccess(M)(M m)
 }
 
 /**
- * Return the module name from a praser instance with the following format: `foo.bar.module`
+ * Return the module name from a ModuleDeclaration instance with the following format: `foo.bar.module`
  */
-const(char[]) getModuleName(Parser!ASTBase p)
+const(char[]) getModuleName(ASTBase.ModuleDeclaration *mdptr)
 {
 	import std.array : array, join;
 
-	if (p.md !is null)
+	if (mdptr !is null)
 	{
 		import std.algorithm : map;
-		ASTBase.ModuleDeclaration md = *p.md;
+		ASTBase.ModuleDeclaration md = *mdptr;
 		
 		if (md.packages.length != 0)
 			return join(md.packages.map!(e => e.toString()).array ~ md.id.toString().dup, ".");

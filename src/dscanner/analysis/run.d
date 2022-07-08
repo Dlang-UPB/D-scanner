@@ -270,7 +270,7 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (errorCount > 0 || (staticAnalyze && warningCount > 0))
 			hasErrors = true;
 		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, staticAnalyze);
-		MessageSet resultsDmd = analyzeDmd(fileName, ast_m, getModuleName(astbaseParser), config);
+		MessageSet resultsDmd = analyzeDmd(fileName, ast_m, getModuleName(astbaseParser.md), config);
 		foreach (result; resultsDmd[])
 		{
 			results.insert(result);
