@@ -694,14 +694,25 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	return set;
 }
-MessageSet analyzeDmd(string fileName, ASTBase.Module m)
-{
-	scope vis = new EnumArrayVisitor!ASTBase(fileName);
-	m.accept(vis);
 
+MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName, const StaticAnalysisConfig config)
+{
 	MessageSet set = new MessageSet;
-	foreach(message; vis.messages)
-		set.insert(message);
+	BaseAnalyzerDmd!ASTBase[] visitors;
+
+	if (moduleName.shouldRunDmd!(ObjectConstCheck!ASTBase)(config))
+		visitors ~= new ObjectConstCheck!ASTBase(fileName);
+
+	if (moduleName.shouldRunDmd!(EnumArrayVisitor!ASTBase)(config))
+		visitors ~= new EnumArrayVisitor!ASTBase(fileName);
+
+	foreach (visitor; visitors)
+	{
+		m.accept(visitor);
+		
+		foreach (message; visitor.messages)
+			set.insert(message);
+	}
 
 	return set;
 }

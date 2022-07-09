@@ -253,4 +253,8 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 		immutable string message = "Unexpected warnings:\n" ~ unexpectedWarnings.join("\n");
 		throw new AssertError(message, file, line);
 	}
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> replace libdparse in objectconst functionality + unittests integration with dmd (#17)
