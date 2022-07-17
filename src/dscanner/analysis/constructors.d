@@ -1,36 +1,35 @@
 module dscanner.analysis.constructors;
 
-import dparse.ast;
-import dparse.lexer;
 import std.stdio;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
-import dsymbol.scope_ : Scope;
 
-final class ConstructorCheck : BaseAnalyzer
+extern(C++) class ConstructorCheck(AST) : BaseAnalyzerDmd!AST
 {
-	alias visit = BaseAnalyzer.visit;
-
+	alias visit = BaseAnalyzerDmd!AST.visit;
 	mixin AnalyzerInfo!"constructor_check";
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName);
 	}
 
-	override void visit(const ClassDeclaration classDeclaration)
+	override void visit(AST.ClassDeclaration cd)
 	{
 		immutable bool oldHasDefault = hasDefaultArgConstructor;
 		immutable bool oldHasNoArg = hasNoArgConstructor;
+		immutable State prev = state;
+
 		hasNoArgConstructor = false;
 		hasDefaultArgConstructor = false;
-		immutable State prev = state;
 		state = State.inClass;
-		classDeclaration.accept(this);
+
+		super.visit(cd);
+
 		if (hasNoArgConstructor && hasDefaultArgConstructor)
 		{
-			addErrorMessage(classDeclaration.name.line,
-					classDeclaration.name.column, "dscanner.confusing.constructor_args",
+			addErrorMessage(cast(ulong) cd.loc.linnum,
+					cast(ulong) cd.loc.charnum, "dscanner.confusing.constructor_args",
 					"This class has a zero-argument constructor as well as a"
 					~ " constructor with one default argument. This can be confusing.");
 		}
@@ -39,40 +38,53 @@ final class ConstructorCheck : BaseAnalyzer
 		state = prev;
 	}
 
-	override void visit(const StructDeclaration structDeclaration)
+	override void visit(AST.StructDeclaration sd)
 	{
 		immutable State prev = state;
+		
 		state = State.inStruct;
-		structDeclaration.accept(this);
+		super.visit(sd);
 		state = prev;
 	}
 
-	override void visit(const Constructor constructor)
+	override void visit(AST.FuncDeclaration fd)
 	{
-		final switch (state)
+
+		auto tf = fd.type.isTypeFunction();
+
+		if (fd.ident.toString() == "__ctor")
 		{
-		case State.inStruct:
-			if (constructor.parameters.parameters.length == 1
-					&& constructor.parameters.parameters[0].default_ !is null)
+			if (tf)
 			{
-				addErrorMessage(constructor.line, constructor.column,
-						"dscanner.confusing.struct_constructor_default_args",
-						"This struct constructor can never be called with its "
-						~ "default argument.");
+
+				final switch (state)
+				{
+				case State.inStruct:
+					if (tf.parameterList.parameters.length == 1
+							&& (*tf.parameterList.parameters)[0].defaultArg !is null)
+					{
+						addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum,
+								"dscanner.confusing.struct_constructor_default_args",
+								"This struct constructor can never be called with its "
+								~ "default argument.");
+					}
+					break;
+				case State.inClass:
+					if (tf.parameterList.parameters.length == 1
+							&& (*tf.parameterList.parameters)[0].defaultArg !is null)
+					{
+						hasDefaultArgConstructor = true;
+					}
+					else if (tf.parameterList.parameters.length == 0)
+						hasNoArgConstructor = true;
+					break;
+				case State.ignoring:
+					break;
+				}
 			}
-			break;
-		case State.inClass:
-			if (constructor.parameters.parameters.length == 1
-					&& constructor.parameters.parameters[0].default_ !is null)
-			{
-				hasDefaultArgConstructor = true;
-			}
-			else if (constructor.parameters.parameters.length == 0)
-				hasNoArgConstructor = true;
-			break;
-		case State.ignoring:
-			break;
 		}
+		
+		super.visit(fd);
 	}
 
 private:
@@ -96,7 +108,7 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.constructor_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		class Cat // [warn]: This class has a zero-argument constructor as well as a constructor with one default argument. This can be confusing.
 		{
 			this() {}
