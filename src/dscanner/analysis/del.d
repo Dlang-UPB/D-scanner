@@ -6,30 +6,30 @@
 module dscanner.analysis.del;
 
 import std.stdio;
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
+import dscanner.analysis.helpers;
 import dsymbol.scope_;
 
 /**
  * Checks for use of the deprecated 'delete' keyword
  */
-final class DeleteCheck : BaseAnalyzer
+extern(C++) class DeleteCheck(AST) : BaseAnalyzerDmd!AST
 {
-	alias visit = BaseAnalyzer.visit;
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
 	mixin AnalyzerInfo!"delete_check";
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName);
 	}
 
-	override void visit(const DeleteExpression d)
+	override void visit(AST.DeleteExp d)
 	{
-		addErrorMessage(d.line, d.column, "dscanner.deprecated.delete_keyword",
+		addErrorMessage(cast(ulong) d.loc.linnum, cast(ulong) d.loc.charnum, "dscanner.deprecated.delete_keyword",
 				"Avoid using the 'delete' keyword.");
-		d.accept(this);
+		// d.accept(this);
+		super.visit(d);
 	}
 }
 
@@ -40,7 +40,7 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.delete_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testDelete()
 		{
 			int[int] data = [1 : 2];
