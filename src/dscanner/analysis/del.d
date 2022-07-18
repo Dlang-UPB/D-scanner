@@ -28,7 +28,6 @@ extern(C++) class DeleteCheck(AST) : BaseAnalyzerDmd!AST
 	{
 		addErrorMessage(cast(ulong) d.loc.linnum, cast(ulong) d.loc.charnum, "dscanner.deprecated.delete_keyword",
 				"Avoid using the 'delete' keyword.");
-		// d.accept(this);
 		super.visit(d);
 	}
 }
