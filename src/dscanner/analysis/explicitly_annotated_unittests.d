@@ -14,7 +14,6 @@ import std.stdio;
 extern(C++) class ExplicitlyAnnotatedUnittestCheck(AST) : BaseAnalyzerDmd!AST
 {
 	enum string KEY = "dscanner.style.explicitly_annotated_unittest";
-	// enum string MESSAGE = "A unittest should be annotated with at least @safe or @system";
     mixin AnalyzerInfo!"explicitly_annotated_unittests";
 	alias visit = BaseAnalyzerDmd!AST.visit;
 
