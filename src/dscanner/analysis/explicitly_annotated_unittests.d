@@ -45,9 +45,6 @@ unittest
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 	import dscanner.analysis.helpers : assertAnalyzerWarnings;
 
-	// writeln("INTRA IN EXPLICITLY ANNOTATED UNITTEST");
-	// writeln("ASD SAD ASDDAS");
-
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.explicitly_annotated_unittests = Check.enabled;
 
