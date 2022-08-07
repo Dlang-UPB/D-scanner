@@ -486,10 +486,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new UnmodifiedFinder(fileName, moduleScope,
 		analysisConfig.could_be_immutable_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!DeleteCheck(analysisConfig))
-		checks ~= new DeleteCheck(fileName, moduleScope,
-		analysisConfig.delete_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!DuplicateAttributeCheck(analysisConfig))
 		checks ~= new DuplicateAttributeCheck(fileName, moduleScope,
 		analysisConfig.duplicate_attribute == Check.skipTests && !ut);
@@ -684,6 +680,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	if (moduleName.shouldRunDmd!(EnumArrayVisitor!ASTBase)(config))
 		visitors ~= new EnumArrayVisitor!ASTBase(fileName);
+
+	if (moduleName.shouldRunDmd!(DeleteCheck!ASTBase)(config))
+		visitors ~= new DeleteCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{
