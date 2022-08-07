@@ -4,52 +4,37 @@
 
 module dscanner.analysis.explicitly_annotated_unittests;
 
-import dparse.lexer;
-import dparse.ast;
 import dscanner.analysis.base;
-
+import dscanner.analysis.helpers;
 import std.stdio;
 
 /**
  * Requires unittests to be explicitly annotated with either @safe or @system
  */
-final class ExplicitlyAnnotatedUnittestCheck : BaseAnalyzer
+extern(C++) class ExplicitlyAnnotatedUnittestCheck(AST) : BaseAnalyzerDmd!AST
 {
 	enum string KEY = "dscanner.style.explicitly_annotated_unittest";
-	enum string MESSAGE = "A unittest should be annotated with at least @safe or @system";
+	// enum string MESSAGE = "A unittest should be annotated with at least @safe or @system";
     mixin AnalyzerInfo!"explicitly_annotated_unittests";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	///
-	this(string fileName, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, null, skipTests);
+		super(fileName);
 	}
 
-	override void visit(const Declaration decl)
+	override void visit(AST.UnitTestDeclaration d)
 	{
-		if (decl.unittest_ !is null)
-		{
-			bool isSafeOrSystem;
-			if (decl.attributes !is null)
-			foreach (attribute; decl.attributes)
-			{
-				if (attribute.atAttribute !is null)
-				{
-					const token = attribute.atAttribute.identifier.text;
-					if (token == "safe" || token == "system")
-					{
-						isSafeOrSystem = true;
-						break;
-					}
-				}
-			}
-			if (!isSafeOrSystem)
-				addErrorMessage(decl.unittest_.line, decl.unittest_.column, KEY, MESSAGE);
-		}
-		decl.accept(this);
+		import dmd.astenums : STC;
+	
+		if (!(d.storage_class & STC.safe || d.storage_class & STC.system))
+			addErrorMessage(cast(ulong) d.loc.linnum, cast(ulong) d.loc.charnum,
+					KEY, MESSAGE);
+
+		super.visit(d);
 	}
 
-	alias visit = BaseAnalyzer.visit;
+	enum string MESSAGE = "A unittest should be annotated with at least @safe or @system";
 
 }
 
@@ -60,35 +45,35 @@ unittest
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 	import dscanner.analysis.helpers : assertAnalyzerWarnings;
 
+	// writeln("INTRA IN EXPLICITLY ANNOTATED UNITTEST");
+	// writeln("ASD SAD ASDDAS");
+
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.explicitly_annotated_unittests = Check.enabled;
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
+
+		@disable foo() {}
+
 		@safe unittest {}
 		@system unittest {}
 		pure nothrow @system @nogc unittest {}
 
-		unittest {} // [warn]: %s
-		pure nothrow @nogc unittest {} // [warn]: %s
-	}c.format(
-		ExplicitlyAnnotatedUnittestCheck.MESSAGE,
-		ExplicitlyAnnotatedUnittestCheck.MESSAGE,
-	), sac);
+		unittest {} // [warn]: A unittest should be annotated with at least @safe or @system
+		pure nothrow @nogc unittest {} // [warn]: A unittest should be annotated with at least @safe or @system
+	}c, sac);
 
 	// nested
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		struct Foo
 		{
 			@safe unittest {}
 			@system unittest {}
 
-			unittest {} // [warn]: %s
-			pure nothrow @nogc unittest {} // [warn]: %s
+			unittest {} // [warn]: A unittest should be annotated with at least @safe or @system
+			pure nothrow @nogc unittest {} // [warn]: A unittest should be annotated with at least @safe or @system
 		}
-	}c.format(
-		ExplicitlyAnnotatedUnittestCheck.MESSAGE,
-		ExplicitlyAnnotatedUnittestCheck.MESSAGE,
-	), sac);
+	}c, sac);
 
 	stderr.writeln("Unittest for ExplicitlyAnnotatedUnittestCheck passed.");
 }
