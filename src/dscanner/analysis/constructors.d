@@ -47,13 +47,13 @@ extern(C++) class ConstructorCheck(AST) : BaseAnalyzerDmd!AST
 		state = prev;
 	}
 
-	override void visit(AST.FuncDeclaration fd)
+	override void visit(AST.CtorDeclaration fd)
 	{
 
 		auto tf = fd.type.isTypeFunction();
 
-		if (fd.ident.toString() == "__ctor")
-		{
+		// if (fd.ident.toString() == "__ctor")
+		// {
 			if (tf)
 			{
 
@@ -82,7 +82,7 @@ extern(C++) class ConstructorCheck(AST) : BaseAnalyzerDmd!AST
 					break;
 				}
 			}
-		}
+		// }
 		
 		super.visit(fd);
 	}
