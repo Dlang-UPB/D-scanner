@@ -52,37 +52,34 @@ extern(C++) class ConstructorCheck(AST) : BaseAnalyzerDmd!AST
 
 		auto tf = fd.type.isTypeFunction();
 
-		// if (fd.ident.toString() == "__ctor")
-		// {
-			if (tf)
-			{
+		if (tf)
+		{
 
-				final switch (state)
+			final switch (state)
+			{
+			case State.inStruct:
+				if (tf.parameterList.parameters.length == 1
+						&& (*tf.parameterList.parameters)[0].defaultArg !is null)
 				{
-				case State.inStruct:
-					if (tf.parameterList.parameters.length == 1
-							&& (*tf.parameterList.parameters)[0].defaultArg !is null)
-					{
-						addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum,
-								"dscanner.confusing.struct_constructor_default_args",
-								"This struct constructor can never be called with its "
-								~ "default argument.");
-					}
-					break;
-				case State.inClass:
-					if (tf.parameterList.parameters.length == 1
-							&& (*tf.parameterList.parameters)[0].defaultArg !is null)
-					{
-						hasDefaultArgConstructor = true;
-					}
-					else if (tf.parameterList.parameters.length == 0)
-						hasNoArgConstructor = true;
-					break;
-				case State.ignoring:
-					break;
+					addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum,
+							"dscanner.confusing.struct_constructor_default_args",
+							"This struct constructor can never be called with its "
+							~ "default argument.");
 				}
+				break;
+			case State.inClass:
+				if (tf.parameterList.parameters.length == 1
+						&& (*tf.parameterList.parameters)[0].defaultArg !is null)
+				{
+					hasDefaultArgConstructor = true;
+				}
+				else if (tf.parameterList.parameters.length == 0)
+					hasNoArgConstructor = true;
+				break;
+			case State.ignoring:
+				break;
 			}
-		// }
+		}
 		
 		super.visit(fd);
 	}
