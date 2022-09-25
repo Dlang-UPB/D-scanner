@@ -20,7 +20,6 @@ import dsymbol.scope_;
  * ---
  */
 extern(C++) class LogicPrecedenceCheck(AST) : BaseAnalyzerDmd!AST
-// final class LogicPrecedenceCheck : BaseAnalyzer
 {
 	enum string KEY = "dscanner.confusing.logical_precedence";
 	mixin AnalyzerInfo!"logical_precedence_check";
@@ -38,18 +37,23 @@ extern(C++) class LogicPrecedenceCheck(AST) : BaseAnalyzerDmd!AST
 		const AST.Expression left = le.e1.op == EXP.andAnd ? le.e1 : null;
 		const AST.Expression right = le.e2.op == EXP.andAnd ? le.e2 : null;
 
+		if (le.op != EXP.orOr)
+			goto END;
+
 		if (!left && !right)
-			return;
+			goto END;
 
 		if (left && left.parens)
-			return;
+			goto END;
 
 		if (right && right.parens)
-			return;
+			goto END;
 
 		addErrorMessage(cast(ulong) le.loc.linnum, cast(ulong) le.loc.charnum, KEY,
 				"Use parenthesis to clarify this expression.");
 		
+END:
+		super.visit(le);
 	}
 }
 

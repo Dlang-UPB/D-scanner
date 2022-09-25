@@ -518,10 +518,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new LocalImportCheck(fileName, moduleScope,
 		analysisConfig.local_import_check == Check.skipTests && !ut);
 
-	// if (moduleName.shouldRun!LogicPrecedenceCheck(analysisConfig))
-	// 	checks ~= new LogicPrecedenceCheck(fileName, moduleScope,
-	// 	analysisConfig.logical_precedence_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!MismatchedArgumentCheck(analysisConfig))
 		checks ~= new MismatchedArgumentCheck(fileName, moduleScope,
 		analysisConfig.mismatched_args_check == Check.skipTests && !ut);
