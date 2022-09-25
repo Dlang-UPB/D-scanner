@@ -19,31 +19,37 @@ import dsymbol.scope_;
  * if (a && (b || c)) // good
  * ---
  */
-final class LogicPrecedenceCheck : BaseAnalyzer
+extern(C++) class LogicPrecedenceCheck(AST) : BaseAnalyzerDmd!AST
+// final class LogicPrecedenceCheck : BaseAnalyzer
 {
-	alias visit = BaseAnalyzer.visit;
-
 	enum string KEY = "dscanner.confusing.logical_precedence";
 	mixin AnalyzerInfo!"logical_precedence_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName);
 	}
 
-	override void visit(const OrOrExpression orOr)
+	override void visit(AST.LogicalExp le)
 	{
-		if (orOr.left is null || orOr.right is null)
+		import dmd.tokens : EXP;
+
+		const AST.Expression left = le.e1.op == EXP.andAnd ? le.e1 : null;
+		const AST.Expression right = le.e2.op == EXP.andAnd ? le.e2 : null;
+
+		if (!left && !right)
 			return;
-		const AndAndExpression left = cast(AndAndExpression) orOr.left;
-		const AndAndExpression right = cast(AndAndExpression) orOr.right;
-		if (left is null && right is null)
+
+		if (left && left.parens)
 			return;
-		if ((left !is null && left.right is null) && (right !is null && right.right is null))
+
+		if (right && right.parens)
 			return;
-		addErrorMessage(orOr.line, orOr.column, KEY,
+
+		addErrorMessage(cast(ulong) le.loc.linnum, cast(ulong) le.loc.charnum, KEY,
 				"Use parenthesis to clarify this expression.");
-		orOr.accept(this);
+		
 	}
 }
 
@@ -53,7 +59,7 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.logical_precedence_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testFish()
 		{
 			if (a && b || c) {} // [warn]: Use parenthesis to clarify this expression.

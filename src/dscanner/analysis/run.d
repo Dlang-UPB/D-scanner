@@ -518,9 +518,9 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new LocalImportCheck(fileName, moduleScope,
 		analysisConfig.local_import_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!LogicPrecedenceCheck(analysisConfig))
-		checks ~= new LogicPrecedenceCheck(fileName, moduleScope,
-		analysisConfig.logical_precedence_check == Check.skipTests && !ut);
+	// if (moduleName.shouldRun!LogicPrecedenceCheck(analysisConfig))
+	// 	checks ~= new LogicPrecedenceCheck(fileName, moduleScope,
+	// 	analysisConfig.logical_precedence_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!MismatchedArgumentCheck(analysisConfig))
 		checks ~= new MismatchedArgumentCheck(fileName, moduleScope,
@@ -683,6 +683,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	if (moduleName.shouldRunDmd!(DeleteCheck!ASTBase)(config))
 		visitors ~= new DeleteCheck!ASTBase(fileName);
+
+	if (moduleName.shouldRunDmd!(LogicPrecedenceCheck!ASTBase)(config))
+		visitors ~= new LogicPrecedenceCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{
