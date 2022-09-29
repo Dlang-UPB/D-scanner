@@ -34,8 +34,8 @@ extern(C++) class LogicPrecedenceCheck(AST) : BaseAnalyzerDmd!AST
 	{
 		import dmd.tokens : EXP;
 
-		const AST.Expression left = le.e1.op == EXP.andAnd ? le.e1 : null;
-		const AST.Expression right = le.e2.op == EXP.andAnd ? le.e2 : null;
+		const AST.LogicalExp left = le.e1.op == EXP.andAnd ? cast(AST.LogicalExp)le.e1 : null;
+		const AST.LogicalExp right = le.e2.op == EXP.andAnd ? cast(AST.LogicalExp)le.e2 : null;
 
 		if (le.op != EXP.orOr)
 			goto END;
@@ -47,6 +47,9 @@ extern(C++) class LogicPrecedenceCheck(AST) : BaseAnalyzerDmd!AST
 			goto END;
 
 		if (right && right.parens)
+			goto END;
+
+		if ((left !is null && left.e2 is null) && (right !is null && right.e2 is null))
 			goto END;
 
 		addErrorMessage(cast(ulong) le.loc.linnum, cast(ulong) le.loc.charnum, KEY,
