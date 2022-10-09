@@ -567,9 +567,9 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new AutoRefAssignmentCheck(fileName,
 		analysisConfig.auto_ref_assignment_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!IncorrectInfiniteRangeCheck(analysisConfig))
-		checks ~= new IncorrectInfiniteRangeCheck(fileName,
-		analysisConfig.incorrect_infinite_range_check == Check.skipTests && !ut);
+	// if (moduleName.shouldRun!IncorrectInfiniteRangeCheck(analysisConfig))
+	// 	checks ~= new IncorrectInfiniteRangeCheck(fileName,
+	// 	analysisConfig.incorrect_infinite_range_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!UselessAssertCheck(analysisConfig))
 		checks ~= new UselessAssertCheck(fileName,
@@ -683,6 +683,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	if (moduleName.shouldRunDmd!(DeleteCheck!ASTBase)(config))
 		visitors ~= new DeleteCheck!ASTBase(fileName);
+
+	if (moduleName.shouldRunDmd!(IncorrectInfiniteRangeCheck!ASTBase)(config))
+		visitors ~= new IncorrectInfiniteRangeCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{
