@@ -47,7 +47,7 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 		AST.ReturnStatement rs = fd.fbody ? fd.fbody.isReturnStatement() : null;
 		AST.CompoundStatement cs = fd.fbody ? fd.fbody.isCompoundStatement() : null;
 
-		if (fd.ident.toString() == "empty" && tf.next.ty == Tbool && inStruct)
+		if (fd.ident && fd.ident.toString() == "empty" && tf && tf.next && tf.next.ty == Tbool && inStruct)
 		{
 			if (rs)
 			{
