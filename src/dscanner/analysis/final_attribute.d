@@ -9,6 +9,7 @@ import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 import std.string : format;
 import std.stdio;
+import dmd.astbase;
 
 /**
  * Checks for useless usage of the final attribute.
@@ -86,7 +87,6 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 	override void visit(AST.TemplateDeclaration td)
 	{
 		import dmd.astenums : STC;
-		import dmd.astbase;
 
 		if (!td.members)
 			return;
@@ -192,8 +192,6 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.VisibilityDeclaration vd)
 	{
-		import dmd.astbase;
-
 		if (vd.visibility.kind == ASTBase.Visibility.Kind.private_)
 			_private = true;
 		else
@@ -224,7 +222,6 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dmd.astbase;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.final_attribute_check = Check.enabled;
