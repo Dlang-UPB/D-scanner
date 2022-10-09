@@ -71,6 +71,10 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 		super.visit(fd);
 	}
 
+	override void visit(AST.UnitTestDeclaration ud)
+	{
+		
+	}
 
 private:
 	uint inStruct;
