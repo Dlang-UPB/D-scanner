@@ -131,17 +131,6 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 	override void visit(AST.FuncDeclaration fd)
 	{
 		import dmd.astenums : STC;
-	
-		// writeln(fd.ident.toString());
-		if (fd.ident.toString() == "errno")
-		{
-			writeln("STORAGE CLASS PENTRU ERRNO ESTE = ");
-			writeln(fd.storage_class);
-			writeln("BLOC STATIC ESTE = ");
-			writeln(_blockStatic);
-		}
-
-		// else writeln("NU INTRA AICI IN IF");
 
 		if (_parent == Parent.class_ && _private && fd.storage_class & STC.final_)
 			addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
