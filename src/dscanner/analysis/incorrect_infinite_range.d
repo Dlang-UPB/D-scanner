@@ -41,7 +41,7 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.FuncDeclaration fd)
 	{
-		import dmd.astenums;
+		import dmd.astenums : Tbool;
 
 		AST.TypeFunction tf = fd.type.isTypeFunction();
 		AST.ReturnStatement rs = fd.fbody ? fd.fbody.isReturnStatement() : null;
