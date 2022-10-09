@@ -44,8 +44,8 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 		import dmd.astenums;
 
 		AST.TypeFunction tf = fd.type.isTypeFunction();
-		AST.ReturnStatement rs = fd.fbody.isReturnStatement();
-		AST.CompoundStatement cs = fd.fbody.isCompoundStatement();
+		AST.ReturnStatement rs = fd.fbody ? fd.fbody.isReturnStatement() : null;
+		AST.CompoundStatement cs = fd.fbody ? fd.fbody.isCompoundStatement() : null;
 
 		if (fd.ident.toString() == "empty" && tf.next.ty == Tbool && inStruct)
 		{
