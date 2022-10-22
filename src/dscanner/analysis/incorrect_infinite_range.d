@@ -27,23 +27,23 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.StructDeclaration sd)
 	{
-		inStruct++;
+		inAggregate++;
 		super.visit(sd);
-		inStruct--;
+		inAggregate--;
 	}
 
 	override void visit(AST.ClassDeclaration cd)
 	{
-		inStruct++;
+		inAggregate++;
 		super.visit(cd);
-		inStruct--;
+		inAggregate--;
 	}
 
 	override void visit(AST.FuncDeclaration fd)
 	{
 		import dmd.astenums : Tbool;
 
-		if (!inStruct)
+		if (!inAggregate)
 			return;
 
 		if (!fd.ident || fd.ident.toString() != "empty")
@@ -88,7 +88,7 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 	}
 
 private:
-	uint inStruct;
+	uint inAggregate;
 	enum string KEY = "dscanner.suspicious.incorrect_infinite_range";
 	enum string MESSAGE = "Use `enum bool empty = false;` to define an infinite range.";
 }
