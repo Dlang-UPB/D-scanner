@@ -43,29 +43,40 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 	{
 		import dmd.astenums : Tbool;
 
+		if (!inStruct)
+			return;
+
+		if (!fd.ident || fd.ident.toString() != "empty")
+			return;
+
 		AST.TypeFunction tf = fd.type.isTypeFunction();
+
+		if (!tf || !tf.next || !tf.next.ty)
+			return;
+
 		AST.ReturnStatement rs = fd.fbody ? fd.fbody.isReturnStatement() : null;
-		AST.CompoundStatement cs = fd.fbody ? fd.fbody.isCompoundStatement() : null;
 
-		if (fd.ident && fd.ident.toString() == "empty" && tf && tf.next && tf.next.ty == Tbool && inStruct)
+		if (rs)
 		{
-			if (rs)
-			{
-				AST.IntegerExp ie = cast(AST.IntegerExp) rs.exp;
+			AST.IntegerExp ie = cast(AST.IntegerExp) rs.exp;
 
-				if (ie && ie.value == 0)
-					addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
-					"Use `enum bool empty = false;` to define an infinite range.");
-			}
+			if (ie && ie.value == 0)
+				addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
+				"Use `enum bool empty = false;` to define an infinite range.");
+		}
 
-			if (cs && (*cs.statements).length) if (auto rs1 = (*cs.statements)[0].isReturnStatement())
-			{
-				AST.IntegerExp ie = cast(AST.IntegerExp) rs1.exp;
+		AST.CompoundStatement cs = fd.fbody ? fd.fbody.isCompoundStatement() : null;
+		
+		if (!cs || (*cs.statements).length == 0)
+			return;
 
-				if (ie && ie.value == 0)
-					addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
-					"Use `enum bool empty = false;` to define an infinite range.");
-			} 
+		if (auto rs1 = (*cs.statements)[0].isReturnStatement())
+		{
+			AST.IntegerExp ie = cast(AST.IntegerExp) rs1.exp;
+
+			if (ie && ie.value == 0)
+				addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
+				"Use `enum bool empty = false;` to define an infinite range.");
 		}
 
 		super.visit(fd);
