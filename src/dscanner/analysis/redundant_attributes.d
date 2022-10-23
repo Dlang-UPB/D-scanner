@@ -38,6 +38,7 @@ extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
 	}
 
 	mixin ScopedVisit!(AST.StructDeclaration);
+	mixin ScopedVisit!(AST.ClassDeclaration);
 	mixin ScopedVisit!(AST.InterfaceDeclaration);
 	mixin ScopedVisit!(AST.UnionDeclaration);
 	mixin ScopedVisit!(AST.StaticIfCondition);
@@ -45,9 +46,6 @@ extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.VisibilityDeclaration vd)
 	{
-		import std.stdio : writefln;
-		writefln("Linnum = %u. charnum = %u", vd.loc.linnum, vd.loc.charnum);
-
 		if (currVisibility == vd.visibility.kind)
 		addErrorMessage(cast(ulong) vd.loc.linnum, cast(ulong) vd.loc.charnum, KEY,
 			"Same visibility attribute used as defined on line %u.".format(currLine));
