@@ -4,15 +4,9 @@
 
 module dscanner.analysis.redundant_attributes;
 
-import dparse.ast;
-import dparse.lexer;
-import dsymbol.scope_ : Scope;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 
-import std.algorithm;
-import std.conv : to, text;
-import std.range : empty, front, walkLength;
 import dmd.astbase;
 import std.string : format;
 
