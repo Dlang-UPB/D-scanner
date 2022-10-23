@@ -119,6 +119,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 			_inFinalClass = true;
 		else if (_inFinalClass)
 			_inFinalClass = false;
+		_blockStatic = false;
 
 		mixin (pushPopPrivate);
 		const Parent saved = _parent;
@@ -160,6 +161,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 			addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
 				MSGB.format(FinalAttributeChecker.MESSAGE.func_n));
 
+		_blockStatic = false;
 		mixin (pushPopPrivate);
 		const Parent saved = _parent;
 		_parent = Parent.function_;
@@ -169,6 +171,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.InterfaceDeclaration id)
 	{
+		_blockStatic = false;
 		mixin (pushPopPrivate);
 		const Parent saved = _parent;
 		_parent = Parent.interface_;
@@ -178,6 +181,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.UnionDeclaration ud)
 	{
+		_blockStatic = false;
 		mixin (pushPopPrivate);
 		const Parent saved = _parent;
 		_parent = Parent.union_;
@@ -187,6 +191,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.StructDeclaration sd)
 	{
+		_blockStatic = false;
 		mixin (pushPopPrivate);
 		const Parent saved = _parent;
 		_parent = Parent.struct_;
