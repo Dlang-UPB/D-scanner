@@ -44,9 +44,10 @@ extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
 	}
 
 	mixin ScopedVisit!(AST.StructDeclaration);
-	// mixin ScopedVisit!(AST.FuncDeclaration);
 	mixin ScopedVisit!(AST.InterfaceDeclaration);
 	mixin ScopedVisit!(AST.UnionDeclaration);
+	mixin ScopedVisit!(AST.StaticIfCondition);
+	mixin ScopedVisit!(AST.StaticIfDeclaration);
 
 	override void visit(AST.VisibilityDeclaration vd)
 	{
@@ -55,7 +56,7 @@ extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
 
 		if (currVisibility == vd.visibility.kind)
 		addErrorMessage(cast(ulong) vd.loc.linnum, cast(ulong) vd.loc.charnum, KEY,
-			"Same visibility attribute used as defined on line %u".format(currLine));
+			"Same visibility attribute used as defined on line %u.".format(currLine));
 		ASTBase.Visibility.Kind prevVisibility = currVisibility;
 		uint prevLine = currLine;
 		currVisibility = vd.visibility.kind;
@@ -63,18 +64,6 @@ extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
 		super.visit(vd);
 		currVisibility = prevVisibility;
 		currLine = prevLine;
-	}
-
-	override void visit(AST.UnitTestDeclaration ud)
-	{
-		import std.stdio : writeln;
-		writeln("INTRA AICI");
-	}
-
-	override void visit(AST.FuncDeclaration fd)
-	{
-		import std.stdio : writeln;
-		writeln("INTRA AICI IN FD");
 	}
 
 	enum string KEY = "dscanner.suspicious.redundant_attributes";
@@ -94,27 +83,27 @@ unittest
 
 	// test labels vs. block attributes
 	assertAnalyzerWarningsDMD(q{
-unittest
+class C
 {
 private:
-	private int blah; // [warn]: Same visibility attribute used as defined on line 4
+	private int blah; // [warn]: Same visibility attribute used as defined on line 4.
 protected
 {
-	protected int blah; // [warn]: Same visibility attribute used as defined on line 6
+	protected int blah; // [warn]: Same visibility attribute used as defined on line 6.
 }
-	private int blah; // [warn]: Same visibility attribute used as defined on line 4
+	private int blah; // [warn]: Same visibility attribute used as defined on line 4.
 }}c, sac);
 
 	// test labels vs. block attributes
 	assertAnalyzerWarningsDMD(q{
-unittest
+class C
 {
 	private:
-	private: // [warn]: same visibility attribute used as defined on line 4.
+	private: // [warn]: Same visibility attribute used as defined on line 4.
 	public:
 		private int a;
-		public int b; // [warn]: same visibility attribute used as defined on line 6.
-		public // [warn]: same visibility attribute used as defined on line 6.
+		public int b; // [warn]: Same visibility attribute used as defined on line 6.
+		public // [warn]: Same visibility attribute used as defined on line 6.
 		{
 			int c;
 		}
@@ -122,11 +111,11 @@ unittest
 
 	// test scopes
 	assertAnalyzerWarningsDMD(q{
-unittest
+class C
 {
 private:
-	private int foo2; // [warn]: same visibility attribute used as defined on line 4.
-	private void foo() // [warn]: same visibility attribute used as defined on line 4.
+	private int foo2; // [warn]: Same visibility attribute used as defined on line 4.
+	private void foo() // [warn]: Same visibility attribute used as defined on line 4.
 	{
 		private int blah;
 	}
@@ -134,31 +123,31 @@ private:
 
 	// check duplicated visibility attributes
 	assertAnalyzerWarningsDMD(q{
-unittest
+class C
 {
 private:
 	public int a;
-private: // [warn]: same visibility attribute used as defined on line 4.
+private: // [warn]: Same visibility attribute used as defined on line 4.
 }}c, sac);
 
 	// test conditional compilation
 	assertAnalyzerWarningsDMD(q{
-unittest
+class C
 {
 version(unittest)
 {
 	private:
-	private int foo; // [warn]: same visibility attribute used as defined on line 6.
+	private int foo; // [warn]: Same visibility attribute used as defined on line 6.
 }
 private int foo2;
 }}c, sac);
 
 // test scopes
 	assertAnalyzerWarningsDMD(q{
-unittest
+class C
 {
 public:
-	if (1 == 1)
+	static if (1 == 1)
 	{
 		private int b;
 	}
@@ -166,7 +155,7 @@ public:
 	{
 		public int b;
 	}
-	public int b; // [warn]: same visibility attribute used as defined on line 4.
+	public int b; // [warn]: Same visibility attribute used as defined on line 4.
 }}c, sac);
 }
 
@@ -178,7 +167,7 @@ unittest
 
 	// test labels vs. block attributes
 	assertAnalyzerWarningsDMD(q{
-unittest
+class C
 {
 @safe:
 	@safe void foo();

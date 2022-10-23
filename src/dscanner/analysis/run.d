@@ -619,10 +619,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new AllManCheck(fileName, tokens,
 		analysisConfig.allman_braces_check == Check.skipTests && !ut);
 
-	// if (moduleName.shouldRun!RedundantAttributesCheck(analysisConfig))
-	// 	checks ~= new RedundantAttributesCheck(fileName, moduleScope,
-	// 	analysisConfig.redundant_attributes_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!HasPublicExampleCheck(analysisConfig))
 		checks ~= new HasPublicExampleCheck(fileName, moduleScope,
 		analysisConfig.has_public_example == Check.skipTests && !ut);
