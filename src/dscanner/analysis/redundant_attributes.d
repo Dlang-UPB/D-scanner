@@ -44,6 +44,7 @@ extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
 	mixin ScopedVisit!(AST.StaticIfCondition);
 	mixin ScopedVisit!(AST.StaticIfDeclaration);
 	mixin ScopedVisit!(AST.TemplateDeclaration);
+	mixin ScopedVisit!(AST.ConditionalDeclaration);
 
 	override void visit(AST.VisibilityDeclaration vd)
 	{
