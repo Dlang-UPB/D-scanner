@@ -4,67 +4,69 @@
 
 module dscanner.analysis.label_var_same_name_check;
 
-import dparse.ast;
-import dparse.lexer;
 import dsymbol.scope_ : Scope;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
+import std.conv : to;
 
 /**
  * Checks for labels and variables that have the same name.
  */
-final class LabelVarNameCheck : BaseAnalyzer
+extern(C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd!AST
 {
 	mixin AnalyzerInfo!"label_var_same_name_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	mixin ScopedVisit!(AST.Module);
+	mixin ScopedVisit!(AST.TemplateDeclaration);
+	mixin ScopedVisit!(AST.IfStatement);
+	mixin ScopedVisit!(AST.WhileStatement);
+	mixin ScopedVisit!(AST.ForStatement);
+	mixin ScopedVisit!(AST.CaseStatement);
+	mixin ScopedVisit!(AST.ForeachStatement);
+	mixin ScopedVisit!(AST.ScopeStatement);
+	mixin ScopedVisit!(AST.UnitTestDeclaration);
+	mixin ScopedVisit!(AST.FuncDeclaration);
+
+	mixin AggregateVisit!(AST.ClassDeclaration);
+	mixin AggregateVisit!(AST.StructDeclaration);
+	mixin AggregateVisit!(AST.InterfaceDeclaration);
+	mixin AggregateVisit!(AST.UnionDeclaration);
+
+	extern(D) this(string fileName)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName);
 	}
 
-	mixin ScopedVisit!Module;
-	mixin ScopedVisit!BlockStatement;
-	mixin ScopedVisit!StructBody;
-	mixin ScopedVisit!CaseStatement;
-	mixin ScopedVisit!ForStatement;
-	mixin ScopedVisit!IfStatement;
-	mixin ScopedVisit!TemplateDeclaration;
-
-	mixin AggregateVisit!ClassDeclaration;
-	mixin AggregateVisit!StructDeclaration;
-	mixin AggregateVisit!InterfaceDeclaration;
-	mixin AggregateVisit!UnionDeclaration;
-
-	override void visit(const VariableDeclaration var)
+	override void visit(AST.VarDeclaration vd)
 	{
-		foreach (dec; var.declarators)
-			duplicateCheck(dec.name, false, conditionalDepth > 0);
+		duplicateCheck(Thing(to!string(vd.ident.toChars()), vd.loc.linnum, vd.loc.charnum), false, conditionalDepth > 0);
+		super.visit(vd);
 	}
 
-	override void visit(const LabeledStatement labeledStatement)
+	override void visit(AST.LabelStatement ls)
 	{
-		duplicateCheck(labeledStatement.identifier, true, conditionalDepth > 0);
-		if (labeledStatement.declarationOrStatement !is null)
-			labeledStatement.declarationOrStatement.accept(this);
+		duplicateCheck(Thing(to!string(ls.ident.toChars()), ls.loc.linnum, ls.loc.charnum), true, conditionalDepth > 0);
+		super.visit(ls);
 	}
 
-	override void visit(const ConditionalDeclaration condition)
+	override void visit(AST.ConditionalStatement condition)
 	{
-		if (condition.falseDeclarations.length > 0)
+		if (condition.elsebody)
 			++conditionalDepth;
-		condition.accept(this);
-		if (condition.falseDeclarations.length > 0)
+		
+		super.visit(condition);
+		
+		if (condition.elsebody)
 			--conditionalDepth;
 	}
 
-	override void visit(const VersionCondition condition)
+	override void visit(AST.ConditionalDeclaration condition)
 	{
 		++conditionalDepth;
-		condition.accept(this);
+		super.visit(condition);
 		--conditionalDepth;
-	}
-
-	alias visit = BaseAnalyzer.visit;
+	} 
 
 private:
 
@@ -72,41 +74,42 @@ private:
 
 	template AggregateVisit(NodeType)
 	{
-		override void visit(const NodeType n)
+		override void visit(NodeType n)
 		{
-			pushAggregateName(n.name);
-			n.accept(this);
+			pushScope();
+			pushAggregateName(to!string(n.ident.toString()), n.loc.linnum, n.loc.charnum);
+			super.visit(n);
+			popScope();
 			popAggregateName();
 		}
 	}
 
 	template ScopedVisit(NodeType)
 	{
-		override void visit(const NodeType n)
+		override void visit(NodeType n)
 		{
 			pushScope();
-			n.accept(this);
+			super.visit(n);
 			popScope();
 		}
 	}
 
-	void duplicateCheck(const Token name, bool fromLabel, bool isConditional)
+	void duplicateCheck(const Thing id, bool fromLabel, bool isConditional)
 	{
-		import std.conv : to;
 		import std.range : retro;
 
 		size_t i;
 		foreach (s; retro(stack))
 		{
-			string fqn = parentAggregateText ~ name.text;
+			string fqn = parentAggregateText ~ id.name;
 			const(Thing)* thing = fqn in s;
 			if (thing is null)
-				currentScope[fqn] = Thing(fqn, name.line, name.column, !fromLabel /+, isConditional+/ );
+				currentScope[fqn] = Thing(fqn, id.line, id.column, !fromLabel /+, isConditional+/ );
 			else if (i != 0 || !isConditional)
 			{
 				immutable thisKind = fromLabel ? "Label" : "Variable";
 				immutable otherKind = thing.isVar ? "variable" : "label";
-				addErrorMessage(name.line, name.column, "dscanner.suspicious.label_var_same_name",
+				addErrorMessage(id.line, id.column, "dscanner.suspicious.label_var_same_name",
 						thisKind ~ " \"" ~ fqn ~ "\" has the same name as a "
 						~ otherKind ~ " defined on line " ~ to!string(thing.line) ~ ".");
 			}
@@ -140,9 +143,9 @@ private:
 
 	int conditionalDepth;
 
-	void pushAggregateName(Token name)
+	extern(D) void pushAggregateName(string name, size_t line, size_t column)
 	{
-		parentAggregates ~= name;
+		parentAggregates ~= Thing(name, line, column);
 		updateAggregateText();
 	}
 
@@ -158,12 +161,12 @@ private:
 		import std.array : join;
 
 		if (parentAggregates.length)
-			parentAggregateText = parentAggregates.map!(a => a.text).join(".") ~ ".";
+			parentAggregateText = parentAggregates.map!(a => a.name).join(".") ~ ".";
 		else
 			parentAggregateText = "";
 	}
 
-	Token[] parentAggregates;
+	Thing[] parentAggregates;
 	string parentAggregateText;
 }
 
@@ -174,7 +177,7 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.label_var_same_name_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 unittest
 {
 blah:
