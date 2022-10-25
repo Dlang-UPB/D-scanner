@@ -9,6 +9,8 @@ import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 import std.conv : to;
 
+import std.stdio : writeln;
+
 /**
  * Checks for labels and variables that have the same name.
  */
@@ -40,7 +42,10 @@ extern(C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.VarDeclaration vd)
 	{
-		duplicateCheck(Thing(to!string(vd.ident.toChars()), vd.loc.linnum, vd.loc.charnum), false, conditionalDepth > 0);
+		import dmd.astenums : STC;
+
+		if (! vd.storage_class & STC.scope_)
+			duplicateCheck(Thing(to!string(vd.ident.toChars()), vd.loc.linnum, vd.loc.charnum), false, conditionalDepth > 0);
 		super.visit(vd);
 	}
 
