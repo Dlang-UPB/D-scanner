@@ -228,7 +228,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 	}
 }
 
-unittest
+@system unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 
