@@ -65,14 +65,18 @@ extern(C++) class ImportSortednessCheck(AST) : BaseAnalyzerDmd!AST
 	}
 
 private:
+	enum maxDepth = 20;
 	int level;
 	string[][int] imports;
-	bool[20] levelAvailable;
+	bool[maxDepth] levelAvailable;
 
 	template ScopedVisit(NodeType)
 	{
 		override void visit(NodeType n)
 		{
+			if (level >= maxDepth)
+				return;
+
 			imports[level] = [];
 			imports[++level] = [];
 			levelAvailable[level] = true;
