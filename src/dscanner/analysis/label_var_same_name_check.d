@@ -44,7 +44,7 @@ extern(C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd!AST
 	{
 		import dmd.astenums : STC;
 
-		if (! vd.storage_class & STC.scope_)
+		if (!(vd.storage_class & STC.scope_))
 			duplicateCheck(Thing(to!string(vd.ident.toChars()), vd.loc.linnum, vd.loc.charnum), false, conditionalDepth > 0);
 		super.visit(vd);
 	}
