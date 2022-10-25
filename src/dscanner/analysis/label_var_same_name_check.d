@@ -26,6 +26,7 @@ extern(C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd!AST
 	mixin ScopedVisit!(AST.ForStatement);
 	mixin ScopedVisit!(AST.CaseStatement);
 	mixin ScopedVisit!(AST.ForeachStatement);
+	mixin ScopedVisit!(AST.ForeachRangeStatement);
 	mixin ScopedVisit!(AST.ScopeStatement);
 	mixin ScopedVisit!(AST.UnitTestDeclaration);
 	mixin ScopedVisit!(AST.FuncDeclaration);
