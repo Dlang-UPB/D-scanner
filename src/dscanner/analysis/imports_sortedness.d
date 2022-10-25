@@ -111,24 +111,24 @@ unittest
 	import std.stdio : stderr;
 	import std.format : format;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
+	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.imports_sortedness = Check.enabled;
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import bar.foo;
 		import foo.bar;
 	}c, sac);
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import foo.bar;
 		import bar.foo; // [warn]: %s
 	}c.format(
 		"The imports are not sorted in alphabetical order",
 	), sac);
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import c;
 		import c.b;
 		import c.a; // [warn]: %s
@@ -139,7 +139,7 @@ unittest
 		"The imports are not sorted in alphabetical order",
 	), sac);
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import a.b, a.c, a.d;
 		import a.b, a.d, a.c; // [warn]: %s
 		import a.c, a.b, a.c; // [warn]: %s
@@ -151,7 +151,7 @@ unittest
 	), sac);
 
 	// multiple items out of order
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import foo.bar;
 		import bar.foo; // [warn]: %s
 		import bar.bar.foo; // [warn]: %s
@@ -160,13 +160,13 @@ unittest
 		"The imports are not sorted in alphabetical order",
 	), sac);
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import test : bar;
 		import test : foo;
 	}c, sac);
 
 	// selective imports
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import test : foo;
 		import test : bar; // [warn]: %s
 	}c.format(
@@ -174,13 +174,13 @@ unittest
 	), sac);
 
 	// selective imports
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import test : foo, bar; // [warn]: %s
 	}c.format(
 		"The imports are not sorted in alphabetical order",
 	), sac);
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import b;
 		import c : foo;
 		import c : bar; // [warn]: %s
@@ -190,7 +190,7 @@ unittest
 		"The imports are not sorted in alphabetical order",
 	), sac);
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import c;
 		import c : bar;
 		import d : bar;
@@ -201,13 +201,13 @@ unittest
 		"The imports are not sorted in alphabetical order",
 	), sac);
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import t0;
 		import t1 : a, b = foo;
 		import t2;
 	}c, sac);
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import t1 : a, b = foo;
 		import t1 : b, a = foo; // [warn]: %s
 		import t0 : a, b = foo; // [warn]: %s
@@ -217,7 +217,7 @@ unittest
 	), sac);
 
 	// local imports in functions
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import t2;
 		import t1; // [warn]: %s
 		void foo()
@@ -237,7 +237,7 @@ unittest
 	), sac);
 
 	// local imports in scopes
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import t2;
 		import t1; // [warn]: %s
 		void foo()
@@ -263,7 +263,7 @@ unittest
 	), sac);
 
 	// local imports in functions
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import t2;
 		import t1; // [warn]: %s
 		void foo()
@@ -295,7 +295,7 @@ unittest
 	), sac);
 
 	// nested scopes
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import t2;
 		import t1; // [warn]: %s
 		void foo()
@@ -328,7 +328,7 @@ unittest
 	), sac);
 
 	// local imports in functions
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import t2;
 		import t1; // [warn]: %s
 		struct foo()
@@ -348,13 +348,13 @@ unittest
 	), sac);
 
 	// issue 422 - sorted imports with :
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import foo.bar : bar;
 		import foo.barbar;
 	}, sac);
 
 	// issue 422 - sorted imports with :
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import foo;
 		import foo.bar;
 		import fooa;
@@ -363,7 +363,7 @@ unittest
 	}, sac);
 
 	// condition declaration
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 		import t2;
 		version(unittest)
 		{
@@ -372,7 +372,7 @@ unittest
 	}, sac);
 
 	// if statements
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 	unittest
 	{
 		import t2;
@@ -384,7 +384,7 @@ unittest
 	}, sac);
 
 	// intermediate imports
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarnings(q{
 	unittest
 	{
 		import t2;
