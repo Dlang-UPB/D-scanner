@@ -9,6 +9,8 @@ import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 import dsymbol.scope_;
 
+import std.stdio : writeln;
+
 /**
  * Checks for local imports that import all symbols.
  * See_also: $(LINK https://issues.dlang.org/show_bug.cgi?id=10378)
@@ -33,13 +35,16 @@ extern(C++) class LocalImportCheck(AST) : BaseAnalyzerDmd!AST
 
 	extern(D) this(string fileName)
 	{
-
 		super(fileName);
 		this.localImport = false;
+		writeln("In local imports constructor");
 	}
 
 	override void visit(AST.Import i)
 	{
+
+		writeln("IN VISIT IMPORT");
+
 		if (!i.isstatic && localImport && i.names.length == 0 && !i.aliasId)
 			addErrorMessage(cast(ulong) i.loc.linnum, cast(ulong) i.loc.charnum, KEY, MESSAGE);
 	}
