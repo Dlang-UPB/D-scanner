@@ -46,7 +46,10 @@ extern(C++) class LocalImportCheck(AST) : BaseAnalyzerDmd!AST
 		writeln("IN VISIT IMPORT");
 
 		if (!i.isstatic && localImport && i.names.length == 0 && !i.aliasId)
+		{
+			writeln("HERE MESSAGE SHOULD BE ADDED");
 			addErrorMessage(cast(ulong) i.loc.linnum, cast(ulong) i.loc.charnum, KEY, MESSAGE);
+		}
 	}
 
 private:
