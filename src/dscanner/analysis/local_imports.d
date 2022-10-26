@@ -29,6 +29,7 @@ extern(C++) class LocalImportCheck(AST) : BaseAnalyzerDmd!AST
 	mixin ScopedVisit!(AST.ForeachStatement);
 	mixin ScopedVisit!(AST.ScopeStatement);
 	mixin ScopedVisit!(AST.ConditionalDeclaration);
+	mixin ScopedVisit!(AST.UnitTestDeclaration);
 
 	extern(D) this(string fileName)
 	{
