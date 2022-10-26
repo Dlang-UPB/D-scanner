@@ -680,8 +680,8 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 	if (moduleName.shouldRunDmd!(DeleteCheck!ASTBase)(config))
 		visitors ~= new DeleteCheck!ASTBase(fileName);
 
-	// if (moduleName.shouldRunDmd!(LocalImportCheck!ASTBase)(config))
-	writeln("Adding local import check visitor");
+	if (moduleName.shouldRunDmd!(LocalImportCheck!ASTBase)(config))
+	// writeln("Adding local import check visitor");
 		visitors ~= new LocalImportCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)

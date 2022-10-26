@@ -43,11 +43,11 @@ extern(C++) class LocalImportCheck(AST) : BaseAnalyzerDmd!AST
 	override void visit(AST.Import i)
 	{
 
-		writeln("IN VISIT IMPORT");
+		// writeln("IN VISIT IMPORT");
 
 		if (!i.isstatic && localImport && i.names.length == 0 && !i.aliasId)
 		{
-			writeln("HERE MESSAGE SHOULD BE ADDED");
+			// writeln("HERE MESSAGE SHOULD BE ADDED");
 			addErrorMessage(cast(ulong) i.loc.linnum, cast(ulong) i.loc.charnum, KEY, MESSAGE);
 		}
 	}
