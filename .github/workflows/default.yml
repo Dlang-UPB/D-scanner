@@ -145,6 +145,10 @@ jobs:
           repository: dlang/phobos
           path: phobos
 
+      - name: Setup upterm session
+        if:  ${{ matrix.build.version != 'min libdparse'}}
+        uses: lhotari/action-upterm@v1
+
       - name: Apply D-Scanner to Phobos
         if:  ${{ matrix.build.version != 'min libdparse'}} # Older versions crash with "Invalid UTF..."
         working-directory: phobos
