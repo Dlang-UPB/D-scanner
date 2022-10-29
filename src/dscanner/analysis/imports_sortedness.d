@@ -5,89 +5,99 @@
 module dscanner.analysis.imports_sortedness;
 
 import dscanner.analysis.base;
-import dparse.lexer;
-import dparse.ast;
-
-import std.stdio;
 
 /**
  * Checks the sortedness of module imports
  */
-final class ImportSortednessCheck : BaseAnalyzer
+extern(C++) class ImportSortednessCheck(AST) : BaseAnalyzerDmd!AST
 {
 	enum string KEY = "dscanner.style.imports_sortedness";
 	enum string MESSAGE = "The imports are not sorted in alphabetical order";
 	mixin AnalyzerInfo!"imports_sortedness";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
 	///
-	this(string fileName, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, null, skipTests);
+		super(fileName);
 	}
 
-	mixin ScopedVisit!Module;
-	mixin ScopedVisit!Statement;
-	mixin ScopedVisit!BlockStatement;
-	mixin ScopedVisit!StructBody;
-	mixin ScopedVisit!IfStatement;
-	mixin ScopedVisit!TemplateDeclaration;
-	mixin ScopedVisit!ConditionalDeclaration;
+	mixin ScopedVisit!(AST.StructDeclaration);
+	mixin ScopedVisit!(AST.FuncDeclaration);
+	mixin ScopedVisit!(AST.InterfaceDeclaration);
+	mixin ScopedVisit!(AST.UnionDeclaration);
+	mixin ScopedVisit!(AST.TemplateDeclaration);
+	mixin ScopedVisit!(AST.IfStatement);
+	mixin ScopedVisit!(AST.WhileStatement);
+	mixin ScopedVisit!(AST.ForStatement);
+	mixin ScopedVisit!(AST.ForeachStatement);
+	mixin ScopedVisit!(AST.ScopeStatement);
+	mixin ScopedVisit!(AST.ConditionalDeclaration);
 
-	override void visit(const VariableDeclaration id)
+
+	override void visit(AST.VarDeclaration vd)
 	{
 		imports[level] = [];
 	}
 
-	override void visit(const ImportDeclaration id)
+	override void visit(AST.Import i)
 	{
-		import std.algorithm.iteration : map;
+		import std.algorithm : map;
 		import std.array : join;
-		import std.string : strip;
+		import std.conv : to;
 
-		if (id.importBindings is null || id.importBindings.importBinds.length == 0)
-		{
-			foreach (singleImport; id.singleImports)
-			{
-				string importModuleName = singleImport.identifierChain.identifiers.map!`a.text`.join(".");
-				addImport(importModuleName, singleImport);
-			}
-		}
+		string importModuleName = i.packages.map!(a => a.toString().dup).join(".");
+
+		if (importModuleName != "")
+			importModuleName ~= "." ~ i.id.toString();
 		else
-		{
-			string importModuleName = id.importBindings.singleImport.identifierChain.identifiers.map!`a.text`.join(".");
+			importModuleName ~= i.id.toString();
 
-			foreach (importBind; id.importBindings.importBinds)
+		if (i.names.length)
+		{
+			foreach (name; i.names)
 			{
-				addImport(importModuleName ~ "-" ~ importBind.left.text, id.importBindings.singleImport);
+				string aux = to!string(importModuleName ~ "-" ~ name.toString());
+				addImport(aux, i);
 			}
 		}
+		else addImport(importModuleName, i);
 	}
 
-	alias visit = BaseAnalyzer.visit;
-
 private:
-
+	enum maxDepth = 20;
 	int level;
 	string[][int] imports;
+	bool[maxDepth] levelAvailable;
 
 	template ScopedVisit(NodeType)
 	{
-		override void visit(const NodeType n)
+		override void visit(NodeType n)
 		{
+			if (level >= maxDepth)
+				return;
+
+			imports[level] = [];
 			imports[++level] = [];
-			n.accept(this);
+			levelAvailable[level] = true;
+			super.visit(n);
 			level--;
 		}
 	}
 
-	void addImport(string importModuleName, const SingleImport singleImport)
+	extern(D) void addImport(string importModuleName, AST.Import i)
 	{
 		import std.uni : sicmp;
 
-		if (imports[level].length > 0 && imports[level][$ -1].sicmp(importModuleName) > 0)
+		if (!levelAvailable[level])
 		{
-			addErrorMessage(singleImport.identifierChain.identifiers[0].line,
-					singleImport.identifierChain.identifiers[0].column, KEY, MESSAGE);
+			imports[level] = [];
+			levelAvailable[level] = true;
+		}
+
+		if (imports[level].length > 0 && imports[level][$ - 1].sicmp(importModuleName) > 0)
+		{
+			addErrorMessage(cast(ulong) i.loc.linnum, cast(ulong) i.loc.charnum, KEY, MESSAGE);
 		}
 		else
 		{
@@ -101,7 +111,7 @@ unittest
 	import std.stdio : stderr;
 	import std.format : format;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarnings;
+	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.imports_sortedness = Check.enabled;
@@ -115,7 +125,7 @@ unittest
 		import foo.bar;
 		import bar.foo; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	assertAnalyzerWarnings(q{
@@ -125,8 +135,8 @@ unittest
 		import d.a;
 		import d; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	assertAnalyzerWarnings(q{
@@ -135,9 +145,9 @@ unittest
 		import a.c, a.b, a.c; // [warn]: %s
 		import foo.bar, bar.foo; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	// multiple items out of order
@@ -146,8 +156,8 @@ unittest
 		import bar.foo; // [warn]: %s
 		import bar.bar.foo; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	assertAnalyzerWarnings(q{
@@ -160,14 +170,14 @@ unittest
 		import test : foo;
 		import test : bar; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	// selective imports
 	assertAnalyzerWarnings(q{
 		import test : foo, bar; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	assertAnalyzerWarnings(q{
@@ -176,8 +186,8 @@ unittest
 		import c : bar; // [warn]: %s
 		import a; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	assertAnalyzerWarnings(q{
@@ -187,8 +197,8 @@ unittest
 		import d; // [warn]: %s
 		import a : bar; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	assertAnalyzerWarnings(q{
@@ -202,8 +212,8 @@ unittest
 		import t1 : b, a = foo; // [warn]: %s
 		import t0 : a, b = foo; // [warn]: %s
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	// local imports in functions
@@ -222,8 +232,8 @@ unittest
 			import f2;
 		}
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	// local imports in scopes
@@ -247,9 +257,9 @@ unittest
 			}
 		}
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	// local imports in functions
@@ -278,10 +288,10 @@ unittest
 			}
 		}
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	// nested scopes
@@ -310,11 +320,11 @@ unittest
 			}
 		}
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	// local imports in functions
@@ -333,8 +343,8 @@ unittest
 			import f2;
 		}
 	}c.format(
-		ImportSortednessCheck.MESSAGE,
-		ImportSortednessCheck.MESSAGE,
+		"The imports are not sorted in alphabetical order",
+		"The imports are not sorted in alphabetical order",
 	), sac);
 
 	// issue 422 - sorted imports with :
