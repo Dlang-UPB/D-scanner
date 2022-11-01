@@ -496,10 +496,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new FloatOperatorCheck(fileName, moduleScope,
 		analysisConfig.float_operator_check == Check.skipTests && !ut);
 
-	// if (moduleName.shouldRun!FunctionAttributeCheck(analysisConfig))
-	// 	checks ~= new FunctionAttributeCheck(fileName, moduleScope,
-	// 	analysisConfig.function_attribute_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!IfElseSameCheck(analysisConfig))
 		checks ~= new IfElseSameCheck(fileName, moduleScope,
 		analysisConfig.if_else_same_check == Check.skipTests&& !ut);
