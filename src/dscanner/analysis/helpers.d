@@ -150,11 +150,24 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 	import dmd.identifier : Identifier;
 	import std.string : toStringz;
 	import dscanner.utils : getModuleName;
+	import std.file : remove, exists;
+	import std.stdio : File;
 
 	Id.initialize();
 	global._init();
 	global.params.useUnitTests = true;
 	ASTBase.Type._init();
+
+	auto deleteme = "test.txt";
+	File temp = File(deleteme, "w");
+	scope(exit)
+	{
+		assert(exists(deleteme));
+		remove(deleteme);
+	}
+
+	temp.write(code);
+	temp.close();
 
 	auto id = Identifier.idPool(file);
 	auto ast_m = new ASTBase.Module(file.toStringz, id, false, false);
@@ -163,7 +176,7 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 	scope astbaseParser = new Parser!ASTBase(ast_m, input, false);
 	astbaseParser.nextToken();
 	ast_m.members = astbaseParser.parseModule();
-	MessageSet rawWarnings = analyzeDmd("test", ast_m, getModuleName(astbaseParser.md), config);
+	MessageSet rawWarnings = analyzeDmd("test.txt", ast_m, getModuleName(astbaseParser.md), config);
 
 	string[] codeLines = code.splitLines();
 

@@ -6,10 +6,15 @@
 module dscanner.analysis.function_attributes;
 
 import dscanner.analysis.base;
-import dparse.ast;
-import dparse.lexer;
 import std.stdio;
 import dsymbol.scope_;
+
+import dscanner.analysis.helpers;
+import dmd.astenums : STC, MODFlags;
+import dmd.lexer : Lexer;
+import dscanner.utils : readFile;
+import dmd.tokens;
+import std.string : format;
 
 /**
  * Prefer
@@ -21,100 +26,127 @@ import dsymbol.scope_;
  * const int getStuff() {}
  * ---
  */
-final class FunctionAttributeCheck : BaseAnalyzer
+extern(C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd!AST
 {
-	alias visit = BaseAnalyzer.visit;
-
 	mixin AnalyzerInfo!"function_attribute_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName);
+		this.inInterface = false;
 	}
 
-	override void visit(const InterfaceDeclaration dec)
+	override void visit(AST.InterfaceDeclaration id)
 	{
-		const t = inInterface;
-		inInterface = true;
-		dec.accept(this);
-		inInterface = t;
+		this.inInterface = true;
+		super.visit(id);
+		this.inInterface = false;
 	}
 
-	override void visit(const ClassDeclaration dec)
+	string getStorage(AST.TypeFunction tf)
 	{
-		const t = inInterface;
-		inInterface = false;
-		dec.accept(this);
-		inInterface = t;
+		if (tf.mod & MODFlags.const_)
+			return "const";
+
+		if (tf.mod & MODFlags.immutable_)
+			return "immutable";
+
+		if (tf.mod & MODFlags.wild)
+			return "inout";
+
+		return null;
 	}
 
-	override void visit(const AttributeDeclaration dec)
+	override void visit(AST.FuncDeclaration fd)
 	{
-		if (inInterface && dec.attribute.attribute == tok!"abstract")
+		if (!fd.type)
 		{
-			addErrorMessage(dec.attribute.attribute.line,
-					dec.attribute.attribute.column, KEY, ABSTRACT_MESSAGE);
+			super.visit(fd);
+			return;
 		}
-	}
 
-	override void visit(const FunctionDeclaration dec)
-	{
-		if (dec.parameters.parameters.length == 0)
+		auto tf = fd.type.isTypeFunction();
+
+		if (!tf)
 		{
-			bool foundConst;
-			bool foundProperty;
-			foreach (attribute; dec.attributes)
-				foundConst = foundConst || attribute.attribute.type == tok!"const"
-					|| attribute.attribute.type == tok!"immutable"
-					|| attribute.attribute.type == tok!"inout";
-			foreach (attribute; dec.memberFunctionAttributes)
-			{
-				foundProperty = foundProperty || (attribute.atAttribute !is null
-						&& attribute.atAttribute.identifier.text == "property");
-				foundConst = foundConst || attribute.tokenType == tok!"const"
-					|| attribute.tokenType == tok!"immutable" || attribute.tokenType == tok!"inout";
-			}
-			if (foundProperty && !foundConst)
-			{
-				addErrorMessage(dec.name.line, dec.name.column, KEY,
-						"Zero-parameter '@property' function should be"
-						~ " marked 'const', 'inout', or 'immutable'.");
-			}
+			super.visit(fd);
+			return;
 		}
-		dec.accept(this);
-	}
 
-	override void visit(const Declaration dec)
-	{
-		if (dec.attributes.length == 0)
-			goto end;
-		foreach (attr; dec.attributes)
+		string storageTok = getStorage(tf);
+
+		if (tf.isproperty() && tf.parameterList.parameters.length == 0 && !storageTok)
+			addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
+				"Zero-parameter '@property' function should be marked 'const', 'inout', or 'immutable'.");
+	
+		if ((fd.storage_class & STC.abstract_) && inInterface)
+			addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
+				"'abstract' attribute is redundant in interface declarations");
+
+		if (storageTok)
 		{
-			if (attr.attribute.type == tok!"")
-				continue;
-			if (attr.attribute == tok!"abstract" && inInterface)
-			{
-				addErrorMessage(attr.attribute.line, attr.attribute.column, KEY, ABSTRACT_MESSAGE);
-				continue;
-			}
-			if (dec.functionDeclaration !is null && (attr.attribute == tok!"const"
-					|| attr.attribute == tok!"inout" || attr.attribute == tok!"immutable"))
-			{
-				import std.string : format;
+			bool foundConst = false;
+			auto bytes = readFile(fileName);
+			
+			bytes ~= "\0";
+			bytes = bytes[fd.loc.fileOffset .. $];
 
-				immutable string attrString = str(attr.attribute.type);
-				addErrorMessage(dec.functionDeclaration.name.line,
-						dec.functionDeclaration.name.column, KEY, format(
-							"'%s' is not an attribute of the return type." ~ " Place it after the parameter list to clarify.",
-							attrString));
-			}
+			scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0);
+			TOK nextTok;
+			lexer.nextToken();
+
+			do {
+				if (lexer.token.value == TOK.const_ || lexer.token.value == TOK.immutable_ || lexer.token.value == TOK.inout_)
+					foundConst = true;
+			
+				nextTok = lexer.nextToken();
+			} while(nextTok != TOK.leftCurly && nextTok != TOK.endOfFile);
+
+			if (!foundConst)
+				addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
+					format(
+							"'%s' is not an attribute of the return type." ~
+							" Place it after the parameter list to clarify.",
+							storageTok
+						));
 		}
-	end:
-		dec.accept(this);
+
+		super.visit(fd);
 	}
 
 private:
 	bool inInterface;
-	enum string ABSTRACT_MESSAGE = "'abstract' attribute is redundant in interface declarations";
 	enum string KEY = "dscanner.confusing.function_attributes";
+}
+
+unittest
+{
+	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
+	import std.file : remove, exists;
+	import std.stdio : File;
+
+	StaticAnalysisConfig sac = disabledConfig();
+	sac.function_attribute_check = Check.enabled;
+
+	assertAnalyzerWarningsDMD(q{
+		class C
+		{
+			bool foo() @property { return true; } // [warn]: Zero-parameter '@property' function should be marked 'const', 'inout', or 'immutable'.
+
+			const void foo() {} // [warn]: 'const' is not an attribute of the return type. Place it after the parameter list to clarify.
+		
+			void goo() const {} // OK
+
+			bool g() @property const { return true; } // OK
+
+		}
+
+		interface I
+		{
+			abstract void foo(); // [warn]: 'abstract' attribute is redundant in interface declarations
+		}
+	}c, sac);
+
+	stderr.writeln("Unittest for ObjectConstCheck passed.");
 }

@@ -496,9 +496,9 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new FloatOperatorCheck(fileName, moduleScope,
 		analysisConfig.float_operator_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!FunctionAttributeCheck(analysisConfig))
-		checks ~= new FunctionAttributeCheck(fileName, moduleScope,
-		analysisConfig.function_attribute_check == Check.skipTests && !ut);
+	// if (moduleName.shouldRun!FunctionAttributeCheck(analysisConfig))
+	// 	checks ~= new FunctionAttributeCheck(fileName, moduleScope,
+	// 	analysisConfig.function_attribute_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!IfElseSameCheck(analysisConfig))
 		checks ~= new IfElseSameCheck(fileName, moduleScope,
@@ -680,6 +680,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	if (moduleName.shouldRunDmd!(FinalAttributeChecker!ASTBase)(config))
 		visitors ~= new FinalAttributeChecker!ASTBase(fileName);
+
+	if (moduleName.shouldRunDmd!(FunctionAttributeCheck!ASTBase)(config))
+		visitors ~= new FunctionAttributeCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{
