@@ -565,10 +565,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new UselessAssertCheck(fileName,
 		analysisConfig.useless_assert_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!AliasSyntaxCheck(analysisConfig))
-		checks ~= new AliasSyntaxCheck(fileName,
-		analysisConfig.alias_syntax_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!StaticIfElse(analysisConfig))
 		checks ~= new StaticIfElse(fileName,
 		analysisConfig.static_if_else_check == Check.skipTests && !ut);
@@ -676,6 +672,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 		
 	if (moduleName.shouldRunDmd!(LengthSubtractionCheck!ASTBase)(config))
 		visitors ~= new LengthSubtractionCheck!ASTBase(fileName);
+		
+	if (moduleName.shouldRunDmd!(AliasSyntaxCheck!ASTBase)(config))
+		visitors ~= new AliasSyntaxCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{
