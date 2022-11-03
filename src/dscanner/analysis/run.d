@@ -508,10 +508,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new LabelVarNameCheck(fileName, moduleScope,
 		analysisConfig.label_var_same_name_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!LengthSubtractionCheck(analysisConfig))
-		checks ~= new LengthSubtractionCheck(fileName, moduleScope,
-		analysisConfig.length_subtraction_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!LocalImportCheck(analysisConfig))
 		checks ~= new LocalImportCheck(fileName, moduleScope,
 		analysisConfig.local_import_check == Check.skipTests && !ut);
@@ -677,6 +673,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	if (moduleName.shouldRunDmd!(RedundantAttributesCheck!ASTBase)(config))
 		visitors ~= new RedundantAttributesCheck!ASTBase(fileName);
+		
+	if (moduleName.shouldRunDmd!(LengthSubtractionCheck!ASTBase)(config))
+		visitors ~= new LengthSubtractionCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{

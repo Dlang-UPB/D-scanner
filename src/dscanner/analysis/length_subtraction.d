@@ -7,8 +7,6 @@ module dscanner.analysis.length_subtraction;
 
 import std.stdio;
 
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 import dsymbol.scope_;
@@ -16,46 +14,32 @@ import dsymbol.scope_;
 /**
  * Checks for subtraction from a .length property. This is usually a bug.
  */
-final class LengthSubtractionCheck : BaseAnalyzer
+extern(C++) class LengthSubtractionCheck(AST) : BaseAnalyzerDmd!AST
 {
-	alias visit = BaseAnalyzer.visit;
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
 	mixin AnalyzerInfo!"length_subtraction_check";
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName);
 	}
 
-	override void visit(const AddExpression addExpression)
+	override void visit(AST.BinExp be)
 	{
-		if (addExpression.operator == tok!"-")
+		import dmd.tokens : EXP;
+
+		if (auto de = be.e1.isDotIdExp())
 		{
-			const UnaryExpression l = cast(const UnaryExpression) addExpression.left;
-			const UnaryExpression r = cast(const UnaryExpression) addExpression.right;
-			if (l is null || r is null)
-			{
-				//				stderr.writeln(__FILE__, " ", __LINE__);
-				goto end;
-			}
-			if (r.primaryExpression is null || r.primaryExpression.primary.type != tok!"intLiteral")
-			{
-				//				stderr.writeln(__FILE__, " ", __LINE__);
-				goto end;
-			}
-			if (l.identifierOrTemplateInstance is null
-					|| l.identifierOrTemplateInstance.identifier.text != "length")
-			{
-				//				stderr.writeln(__FILE__, " ", __LINE__);
-				goto end;
-			}
-			const(Token) token = l.identifierOrTemplateInstance.identifier;
-			addErrorMessage(token.line, token.column, "dscanner.suspicious.length_subtraction",
-					"Avoid subtracting from '.length' as it may be unsigned.");
+			if (be.op == EXP.min && de.ident.toString() == "length")
+				addErrorMessage(cast(ulong) de.loc.linnum, cast(ulong) de.loc.charnum + 1, KEY,
+									"Avoid subtracting from '.length' as it may be unsigned.");
 		}
-	end:
-		addExpression.accept(this);
+
+		super.visit(be);
 	}
+
+	private enum KEY = "dscanner.suspicious.length_subtraction";
 }
 
 unittest
@@ -64,7 +48,7 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.length_subtraction_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testSizeT()
 		{
 			if (i < a.length - 1) // [warn]: Avoid subtracting from '.length' as it may be unsigned.
