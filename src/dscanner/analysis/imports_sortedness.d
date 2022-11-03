@@ -109,7 +109,6 @@ private:
 unittest
 {
 	import std.stdio : stderr;
-	import std.format : format;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
 
@@ -123,42 +122,30 @@ unittest
 
 	assertAnalyzerWarnings(q{
 		import foo.bar;
-		import bar.foo; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import bar.foo; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	assertAnalyzerWarnings(q{
 		import c;
 		import c.b;
-		import c.a; // [warn]: %s
+		import c.a; // [warn]: The imports are not sorted in alphabetical order
 		import d.a;
-		import d; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import d; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	assertAnalyzerWarnings(q{
 		import a.b, a.c, a.d;
-		import a.b, a.d, a.c; // [warn]: %s
-		import a.c, a.b, a.c; // [warn]: %s
-		import foo.bar, bar.foo; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import a.b, a.d, a.c; // [warn]: The imports are not sorted in alphabetical order
+		import a.c, a.b, a.c; // [warn]: The imports are not sorted in alphabetical order
+		import foo.bar, bar.foo; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	// multiple items out of order
 	assertAnalyzerWarnings(q{
 		import foo.bar;
-		import bar.foo; // [warn]: %s
-		import bar.bar.foo; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import bar.foo; // [warn]: The imports are not sorted in alphabetical order
+		import bar.bar.foo; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	assertAnalyzerWarnings(q{
 		import test : bar;
@@ -168,38 +155,28 @@ unittest
 	// selective imports
 	assertAnalyzerWarnings(q{
 		import test : foo;
-		import test : bar; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import test : bar; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	// selective imports
 	assertAnalyzerWarnings(q{
-		import test : foo, bar; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import test : foo, bar; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	assertAnalyzerWarnings(q{
 		import b;
 		import c : foo;
-		import c : bar; // [warn]: %s
-		import a; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import c : bar; // [warn]: The imports are not sorted in alphabetical order
+		import a; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	assertAnalyzerWarnings(q{
 		import c;
 		import c : bar;
 		import d : bar;
-		import d; // [warn]: %s
-		import a : bar; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import d; // [warn]: The imports are not sorted in alphabetical order
+		import a : bar; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	assertAnalyzerWarnings(q{
 		import t0;
@@ -209,21 +186,18 @@ unittest
 
 	assertAnalyzerWarnings(q{
 		import t1 : a, b = foo;
-		import t1 : b, a = foo; // [warn]: %s
-		import t0 : a, b = foo; // [warn]: %s
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+		import t1 : b, a = foo; // [warn]: The imports are not sorted in alphabetical order
+		import t0 : a, b = foo; // [warn]: The imports are not sorted in alphabetical order
+	}c, sac);
 
 	// local imports in functions
 	assertAnalyzerWarnings(q{
 		import t2;
-		import t1; // [warn]: %s
+		import t1; // [warn]: The imports are not sorted in alphabetical order
 		void foo()
 		{
 			import f2;
-			import f1; // [warn]: %s
+			import f1; // [warn]: The imports are not sorted in alphabetical order
 			import f3;
 		}
 		void bar()
@@ -231,23 +205,20 @@ unittest
 			import f1;
 			import f2;
 		}
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+	}c, sac);
 
 	// local imports in scopes
 	assertAnalyzerWarnings(q{
 		import t2;
-		import t1; // [warn]: %s
+		import t1; // [warn]: The imports are not sorted in alphabetical order
 		void foo()
 		{
 			import f2;
-			import f1; // [warn]: %s
+			import f1; // [warn]: The imports are not sorted in alphabetical order
 			import f3;
 			{
 				import f2;
-				import f1; // [warn]: %s
+				import f1; // [warn]: The imports are not sorted in alphabetical order
 				import f3;
 			}
 			{
@@ -256,24 +227,20 @@ unittest
 				import f3;
 			}
 		}
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+	}c, sac);
 
 	// local imports in functions
 	assertAnalyzerWarnings(q{
 		import t2;
-		import t1; // [warn]: %s
+		import t1; // [warn]: The imports are not sorted in alphabetical order
 		void foo()
 		{
 			import f2;
-			import f1; // [warn]: %s
+			import f1; // [warn]: The imports are not sorted in alphabetical order
 			import f3;
 			while (true) {
 				import f2;
-				import f1; // [warn]: %s
+				import f1; // [warn]: The imports are not sorted in alphabetical order
 				import f3;
 			}
 			for (;;) {
@@ -283,58 +250,47 @@ unittest
 			}
 			foreach (el; arr) {
 				import f2;
-				import f1; // [warn]: %s
+				import f1; // [warn]: The imports are not sorted in alphabetical order
 				import f3;
 			}
 		}
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+	}c, sac);
 
 	// nested scopes
 	assertAnalyzerWarnings(q{
 		import t2;
-		import t1; // [warn]: %s
+		import t1; // [warn]: The imports are not sorted in alphabetical order
 		void foo()
 		{
 			import f2;
-			import f1; // [warn]: %s
+			import f1; // [warn]: The imports are not sorted in alphabetical order
 			import f3;
 			{
 				import f2;
-				import f1; // [warn]: %s
+				import f1; // [warn]: The imports are not sorted in alphabetical order
 				import f3;
 				{
 					import f2;
-					import f1; // [warn]: %s
+					import f1; // [warn]: The imports are not sorted in alphabetical order
 					import f3;
 					{
 						import f2;
-						import f1; // [warn]: %s
+						import f1; // [warn]: The imports are not sorted in alphabetical order
 						import f3;
 					}
 				}
 			}
 		}
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+	}c, sac);
 
 	// local imports in functions
 	assertAnalyzerWarnings(q{
 		import t2;
-		import t1; // [warn]: %s
+		import t1; // [warn]: The imports are not sorted in alphabetical order
 		struct foo()
 		{
 			import f2;
-			import f1; // [warn]: %s
+			import f1; // [warn]: The imports are not sorted in alphabetical order
 			import f3;
 		}
 		class bar()
@@ -342,10 +298,7 @@ unittest
 			import f1;
 			import f2;
 		}
-	}c.format(
-		"The imports are not sorted in alphabetical order",
-		"The imports are not sorted in alphabetical order",
-	), sac);
+	}c, sac);
 
 	// issue 422 - sorted imports with :
 	assertAnalyzerWarnings(q{

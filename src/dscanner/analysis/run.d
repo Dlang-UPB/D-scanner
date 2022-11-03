@@ -672,6 +672,7 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	if (moduleName.shouldRunDmd!(FinalAttributeChecker!ASTBase)(config))
 		visitors ~= new FinalAttributeChecker!ASTBase(fileName);
+	
 	if (moduleName.shouldRunDmd!(ImportSortednessCheck!ASTBase)(config))
 		visitors ~= new ImportSortednessCheck!ASTBase(fileName);
 
