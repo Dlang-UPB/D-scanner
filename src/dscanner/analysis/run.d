@@ -585,10 +585,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new AutoFunctionChecker(fileName,
 		analysisConfig.auto_function_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!ImportSortednessCheck(analysisConfig))
-		checks ~= new ImportSortednessCheck(fileName,
-		analysisConfig.imports_sortedness == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!ExplicitlyAnnotatedUnittestCheck(analysisConfig))
 		checks ~= new ExplicitlyAnnotatedUnittestCheck(fileName,
 		analysisConfig.explicitly_annotated_unittests == Check.skipTests && !ut);
@@ -676,6 +672,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	if (moduleName.shouldRunDmd!(FinalAttributeChecker!ASTBase)(config))
 		visitors ~= new FinalAttributeChecker!ASTBase(fileName);
+	
+	if (moduleName.shouldRunDmd!(ImportSortednessCheck!ASTBase)(config))
+		visitors ~= new ImportSortednessCheck!ASTBase(fileName);
 
 	if (moduleName.shouldRunDmd!(IncorrectInfiniteRangeCheck!ASTBase)(config))
 		visitors ~= new IncorrectInfiniteRangeCheck!ASTBase(fileName);
