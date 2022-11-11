@@ -4,7 +4,6 @@
 
 module dscanner.analysis.label_var_same_name_check;
 
-import dsymbol.scope_ : Scope;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 import std.conv : to;
