@@ -581,10 +581,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new AutoFunctionChecker(fileName,
 		analysisConfig.auto_function_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!ExplicitlyAnnotatedUnittestCheck(analysisConfig))
-		checks ~= new ExplicitlyAnnotatedUnittestCheck(fileName,
-		analysisConfig.explicitly_annotated_unittests == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!ProperlyDocumentedPublicFunctions(analysisConfig))
 		checks ~= new ProperlyDocumentedPublicFunctions(fileName,
 		analysisConfig.properly_documented_public_functions == Check.skipTests && !ut);
@@ -676,6 +672,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 		
 	if (moduleName.shouldRunDmd!(LengthSubtractionCheck!ASTBase)(config))
 		visitors ~= new LengthSubtractionCheck!ASTBase(fileName);
+
+	if (moduleName.shouldRunDmd!(ExplicitlyAnnotatedUnittestCheck!ASTBase)(config))
+		visitors ~= new ExplicitlyAnnotatedUnittestCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{
