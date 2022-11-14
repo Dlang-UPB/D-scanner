@@ -31,9 +31,6 @@ extern(C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd!AST
 	mixin ScopedVisit!(AST.FuncDeclaration);
 	mixin ScopedVisit!(AST.FuncLiteralDeclaration);
 	mixin ScopedVisit!(AST.CtorDeclaration);
-	mixin ScopedVisit!(AST.ExpStatement);
-	mixin ScopedVisit!(AST.ExpInitializer);
-	mixin ScopedVisit!(AST.Type);
 
 	mixin AggregateVisit!(AST.ClassDeclaration);
 	mixin AggregateVisit!(AST.StructDeclaration);
@@ -123,7 +120,7 @@ private:
 			string fqn = parentAggregateText ~ id.name;
 			const(Thing)* thing = fqn in s;
 			if (thing is null)
-				currentScope[fqn] = Thing(fqn, id.line, id.column, !fromLabel /+, isConditional+/ );
+				currentScope[fqn] = Thing(fqn, id.line, id.column, !fromLabel);
 			else if (i != 0 || !isConditional)
 			{
 				immutable thisKind = fromLabel ? "Label" : "Variable";
@@ -196,20 +193,20 @@ unittest
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.label_var_same_name_check = Check.enabled;
 	assertAnalyzerWarningsDMD(q{
-void foo()
+unittest
 {
 blah:
 	int blah; // [warn]: Variable "blah" has the same name as a label defined on line 4.
 }
 int blah;
-class C
+unittest
 {
 	static if (stuff)
 		int a;
-	int a; // [warn]: Variable "C.a" has the same name as a variable defined on line 11.
+	int a; // [warn]: Variable "a" has the same name as a variable defined on line 11.
 }
 
-class C
+unittest
 {
 	static if (stuff)
 		int a = 10;
@@ -217,13 +214,13 @@ class C
 		int a = 20;
 }
 
-class C
+unittest
 {
 	static if (stuff)
 		int a = 10;
 	else
 		int a = 20;
-	int a; // [warn]: Variable "C.a" has the same name as a variable defined on line 28.
+	int a; // [warn]: Variable "a" has the same name as a variable defined on line 28.
 }
 template T(stuff)
 {
@@ -240,60 +237,59 @@ void main(string[] args)
 	int b;
 }
 
-class C
+unittest
 {
 	version (Windows)
 		int c = 10;
 	else
 		int c = 20;
-	int c; // [warn]: Variable "C.c" has the same name as a variable defined on line 51.
+	int c; // [warn]: Variable "c" has the same name as a variable defined on line 51.
 }
 
-class C
+unittest
 {
 	version(LittleEndian) { enum string NAME = "UTF-16LE"; }
 	else version(BigEndian)    { enum string NAME = "UTF-16BE"; }
 }
 
-class C
+unittest
 {
 	int a;
 	struct A {int a;}
 }
 
-class C
+unittest
 {
 	int a;
 	struct A { struct A {int a;}}
 }
 
-class C
+unittest
 {
 	int a;
 	class A { class A {int a;}}
 }
 
-class C
+unittest
 {
 	int a;
 	interface A { interface A {int a;}}
 }
 
-class C
+unittest
 {
 	interface A
 	{
 		int a;
-		int a; // [warn]: Variable "C.A.a" has the same name as a variable defined on line 89.
+		int a; // [warn]: Variable "A.a" has the same name as a variable defined on line 89.
 	}
 }
 
-class C
+unittest
 {
 	int aa;
 	struct a { int a; }
 }
-
 }c, sac);
 	stderr.writeln("Unittest for LabelVarNameCheck passed.");
 }
