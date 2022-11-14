@@ -5,35 +5,59 @@
 
 module dscanner.analysis.alias_syntax_check;
 
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
+import dmd.tokens;
+import dmd.lexer : Lexer;
+import dmd.globals : Loc;
 
 /**
  * Checks for uses of the old alias syntax.
  */
-final class AliasSyntaxCheck : BaseAnalyzer
+extern(C++) class AliasSyntaxCheck(AST) : BaseAnalyzerDmd!AST
 {
-	alias visit = BaseAnalyzer.visit;
-
 	mixin AnalyzerInfo!"alias_syntax_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	this(string fileName, bool skipTests = false)
+	extern(D) this(string fileName)
 	{
-		super(fileName, null, skipTests);
+		super(fileName);
 	}
 
-	override void visit(const AliasDeclaration ad)
+	override void visit(AST.AliasDeclaration ad)
 	{
-		if (ad.declaratorIdentifierList is null)
-			return;
-		assert(ad.declaratorIdentifierList.identifiers.length > 0,
-				"Identifier list length is zero, libdparse has a bug");
-		addErrorMessage(ad.declaratorIdentifierList.identifiers[0].line,
-				ad.declaratorIdentifierList.identifiers[0].column, KEY,
-				"Prefer the new \"'alias' identifier '=' type ';'\" syntax"
-				~ " to the  old \"'alias' type identifier ';'\" syntax.");
+		import dscanner.utils: readFile;
+
+		auto bytes = readFile(fileName);
+		bool foundEq = false;
+		Loc idLoc;
+
+		bytes ~= "\0";
+		bytes = bytes[ad.loc.fileOffset .. $];
+
+		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0);
+		TOK nextTok;
+		lexer.nextToken();
+
+		do
+		{
+			if (lexer.token.value == TOK.assign)
+				foundEq = true;
+
+			if (lexer.token.value == TOK.identifier)
+				idLoc = lexer.token.loc;
+
+			nextTok = lexer.nextToken;
+		}
+		while(nextTok != TOK.semicolon && nextTok != TOK.endOfFile);
+
+		if (!foundEq)
+			// Re-lexing is done based on offsets, so the alias appears to be at line 1.
+			// Fix this by computing the initial location.
+			addErrorMessage(cast(ulong) (ad.loc.linnum + idLoc.linnum - 1), cast(ulong) idLoc.charnum, KEY,
+							"Prefer the new \"'alias' identifier '=' type ';'\" syntax"
+							~ " to the  old \"'alias' type identifier ';'\" syntax.");
 	}
+
 
 private:
 	enum KEY = "dscanner.style.alias_syntax";
@@ -41,7 +65,7 @@ private:
 
 unittest
 {
-	import dscanner.analysis.helpers : assertAnalyzerWarnings;
+	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 	import std.stdio : stderr;
 
