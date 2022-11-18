@@ -97,6 +97,11 @@ import dmd.parse : Parser;
 
 bool first = true;
 
+version (unittest)
+	enum ut = true;
+else
+	enum ut = false;
+
 private alias ASTAllocator = CAllocatorImpl!(
 		AllocatorList!(n => Region!Mallocator(1024 * 128), Mallocator));
 
@@ -437,11 +442,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	if (!staticAnalyze)
 		return null;
 
-	version (unittest)
-		enum ut = true;
-	else
-		enum ut = false;
-
 	string moduleName;
 	if (m !is null && m.moduleDeclaration !is null &&
 		  m.moduleDeclaration.moduleName !is null &&
@@ -593,10 +593,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new HasPublicExampleCheck(fileName, moduleScope,
 		analysisConfig.has_public_example == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!AssertWithoutMessageCheck(analysisConfig))
-		checks ~= new AssertWithoutMessageCheck(fileName, moduleScope,
-		analysisConfig.assert_without_msg == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!IfConstraintsIndentCheck(analysisConfig))
 		checks ~= new IfConstraintsIndentCheck(fileName, tokens,
 		analysisConfig.if_constraints_indent == Check.skipTests && !ut);
@@ -673,6 +669,12 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 
 	if (moduleName.shouldRunDmd!(ConstructorCheck!ASTBase)(config))
 		visitors ~= new ConstructorCheck!ASTBase(fileName);
+		
+	if (moduleName.shouldRunDmd!(AssertWithoutMessageCheck!ASTBase)(config))
+		visitors ~= new AssertWithoutMessageCheck!ASTBase(
+			fileName,
+			config.assert_without_msg == Check.skipTests && !ut
+		);
 
 	foreach (visitor; visitors)
 	{

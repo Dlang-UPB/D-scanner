@@ -5,150 +5,69 @@
 module dscanner.analysis.assert_without_msg;
 
 import dscanner.analysis.base;
-import dscanner.utils : safeAccess;
-import dsymbol.scope_ : Scope;
-import dparse.lexer;
-import dparse.ast;
-
 import std.stdio;
-import std.algorithm;
 
 /**
  * Check that all asserts have an explanatory message.
  */
-final class AssertWithoutMessageCheck : BaseAnalyzer
+extern(C++) class AssertWithoutMessageCheck(AST) : BaseAnalyzerDmd!AST
 {
-	enum string KEY = "dscanner.style.assert_without_msg";
-	enum string MESSAGE = "An assert should have an explanatory message";
 	mixin AnalyzerInfo!"assert_without_msg";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
 	///
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName, bool skipTests = false)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const AssertExpression expr)
+	// Avoid visiting in/out contracts for this check
+	override void visitFuncBody(AST.FuncDeclaration f)
 	{
-		if (expr.assertArguments && expr.assertArguments.message is null)
-			addErrorMessage(expr.line, expr.column, KEY, MESSAGE);
+		if (f.fbody)
+        {
+            f.fbody.accept(this);
+        }
 	}
 
-	override void visit(const FunctionCallExpression expr)
+	override void visit(AST.AssertExp ae)
 	{
-		if (!isStdExceptionImported)
-			return;
-
-		if (const IdentifierOrTemplateInstance iot = safeAccess(expr)
-			.unaryExpression.primaryExpression.identifierOrTemplateInstance)
-		{
-			auto ident = iot.identifier;
-			if (ident.text == "enforce" && expr.arguments !is null && expr.arguments.argumentList !is null &&
-					expr.arguments.argumentList.items.length < 2)
-				addErrorMessage(ident.line, ident.column, KEY, MESSAGE);
-		}
+		if (!ae.msg)
+			addErrorMessage(ae.loc.linnum, ae.loc.charnum, KEY, MESSAGE);
 	}
 
-	override void visit(const SingleImport sImport)
+	override void visit(AST.StaticAssert ae)
 	{
-		static immutable stdException = ["std", "exception"];
-		if (sImport.identifierChain.identifiers.map!(a => a.text).equal(stdException))
-			isStdExceptionImported = true;
+		if (!ae.msg)
+			addErrorMessage(ae.loc.linnum, ae.loc.charnum, KEY, MESSAGE);
 	}
 
-	// revert the stack after new scopes
-	override void visit(const Declaration decl)
-	{
-		// be careful - ImportDeclarations don't introduce a new scope
-		if (decl.importDeclaration is null)
-		{
-			bool tmp = isStdExceptionImported;
-			scope(exit) isStdExceptionImported = tmp;
-			decl.accept(this);
-		}
-		else
-			decl.accept(this);
-	}
-
-	mixin ScopedVisit!IfStatement;
-	mixin ScopedVisit!BlockStatement;
-
-	alias visit = BaseAnalyzer.visit;
 
 private:
-	bool isStdExceptionImported;
-
-	template ScopedVisit(NodeType)
-	{
-		override void visit(const NodeType n)
-		{
-			bool tmp = isStdExceptionImported;
-			scope(exit) isStdExceptionImported = tmp;
-			n.accept(this);
-		}
-	}
+	enum string KEY = "dscanner.style.assert_without_msg";
+	enum string MESSAGE = "An assert should have an explanatory message";
 }
 
 unittest
 {
 	import std.stdio : stderr;
-	import std.format : format;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarnings;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.assert_without_msg = Check.enabled;
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 	unittest {
 		assert(0, "foo bar");
-		assert(0); // [warn]: %s
+		assert(0); // [warn]: An assert should have an explanatory message
 	}
-	}c.format(
-		AssertWithoutMessageCheck.MESSAGE,
-	), sac);
+	}c, sac);
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 	unittest {
 		static assert(0, "foo bar");
-		static assert(0); // [warn]: %s
-	}
-	}c.format(
-		AssertWithoutMessageCheck.MESSAGE,
-	), sac);
-
-	// check for std.exception.enforce
-	assertAnalyzerWarnings(q{
-	unittest {
-		enforce(0); // std.exception not imported yet - could be a user-defined symbol
-		import std.exception;
-		enforce(0, "foo bar");
-		enforce(0); // [warn]: %s
-	}
-	}c.format(
-		AssertWithoutMessageCheck.MESSAGE,
-	), sac);
-
-	// check for std.exception.enforce
-	assertAnalyzerWarnings(q{
-	unittest {
-		import exception;
-		class C {
-			import std.exception;
-		}
-		enforce(0); // std.exception not imported yet - could be a user-defined symbol
-		struct S {
-			import std.exception;
-		}
-		enforce(0); // std.exception not imported yet - could be a user-defined symbol
-		if (false) {
-			import std.exception;
-		}
-		enforce(0); // std.exception not imported yet - could be a user-defined symbol
-		{
-			import std.exception;
-		}
-		enforce(0); // std.exception not imported yet - could be a user-defined symbol
+		static assert(0); // [warn]: An assert should have an explanatory message
 	}
 	}c, sac);
 
