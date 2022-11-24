@@ -468,10 +468,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new BackwardsRangeCheck(fileName, moduleScope,
 		analysisConfig.backwards_range_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!BuiltinPropertyNameCheck(analysisConfig))
-		checks ~= new BuiltinPropertyNameCheck(fileName, moduleScope,
-		analysisConfig.builtin_property_names_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!CommaExpressionCheck(analysisConfig))
 		checks ~= new CommaExpressionCheck(fileName, moduleScope,
 		analysisConfig.comma_expression_check == Check.skipTests && !ut);
@@ -677,6 +673,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 			fileName,
 			config.logical_precedence_check == Check.skipTests && !ut
 		);
+	
+	if (moduleName.shouldRunDmd!(BuiltinPropertyNameCheck!ASTBase)(config))
+		visitors ~= new BuiltinPropertyNameCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{
