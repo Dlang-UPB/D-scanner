@@ -5,104 +5,101 @@
 
 module dscanner.analysis.opequals_without_tohash;
 
-import std.stdio;
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
-import dsymbol.scope_ : Scope;
 
 /**
  * Checks for when a class/struct has the method opEquals without toHash, or
  * toHash without opEquals.
  */
-final class OpEqualsWithoutToHashCheck : BaseAnalyzer
+extern(C++) class OpEqualsWithoutToHashCheck(AST) : BaseAnalyzerDmd!AST
 {
-	alias visit = BaseAnalyzer.visit;
-
 	mixin AnalyzerInfo!"opequals_tohash_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName, bool skipTests = false)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const ClassDeclaration node)
+	override void visit(AST.ClassDeclaration cd)
 	{
-		actualCheck(node.name, node.structBody);
-		node.accept(this);
+		visitBaseClasses(cd);
+		visitAggregate(cd);
 	}
 
-	override void visit(const StructDeclaration node)
+	override void visit(AST.StructDeclaration sd)
 	{
-		actualCheck(node.name, node.structBody);
-		node.accept(this);
+		visitAggregate(sd);
 	}
 
-	private void actualCheck(const Token name, const StructBody structBody)
+	private void isInteresting(AST.FuncDeclaration fd, ref bool hasOpEquals, ref bool hasToHash)
 	{
-		bool hasOpEquals;
-		bool hasToHash;
-		bool hasOpCmp;
+		import dmd.astenums : STC;
 
-		// Just return if missing children
-		if (!structBody || !structBody.declarations || name is Token.init)
+		if (!(fd.storage_class & STC.disable) && fd.ident.toString() == "opEquals")
+			hasOpEquals = true;
+
+		if (!(fd.storage_class & STC.disable) && fd.ident.toString() == "toHash")
+			hasToHash = true;
+	}
+
+	private void visitAggregate(AST.AggregateDeclaration ad)
+	{
+		bool hasOpEquals, hasToHash;
+
+		if (!ad.members)
 			return;
-
-		// Check all the function declarations
-		foreach (declaration; structBody.declarations)
+	
+		foreach(member; *ad.members)
 		{
-			// Skip if not a function declaration
-			if (!declaration || !declaration.functionDeclaration)
-				continue;
-
-			bool containsDisable(A)(const A[] attribs)
+			if (auto fd = member.isFuncDeclaration())
 			{
-				import std.algorithm.searching : canFind;
-				return attribs.canFind!(a => a.atAttribute !is null &&
-					a.atAttribute.identifier.text == "disable");
+				isInteresting(fd, hasOpEquals, hasToHash);
+				member.accept(this);
 			}
-
-			const isDeclationDisabled = containsDisable(declaration.attributes) ||
-				containsDisable(declaration.functionDeclaration.memberFunctionAttributes);
-
-			if (isDeclationDisabled)
-				continue;
-
-			// Check if opEquals or toHash
-			immutable string methodName = declaration.functionDeclaration.name.text;
-			if (methodName == "opEquals")
-				hasOpEquals = true;
-			else if (methodName == "toHash")
-				hasToHash = true;
-			else if (methodName == "opCmp")
-				hasOpCmp = true;
+			else if (auto scd = member.isStorageClassDeclaration())
+			{
+				foreach (smember; *scd.decl)
+				{
+					if (auto fd2 = smember.isFuncDeclaration())
+					{
+						isInteresting(fd2, hasOpEquals, hasToHash);
+						smember.accept(this);
+					}
+					else
+						smember.accept(this);
+				}
+			}
+			else
+				member.accept(this);
 		}
 
-		// Warn if has opEquals, but not toHash
 		if (hasOpEquals && !hasToHash)
 		{
-			string message = "'" ~ name.text ~ "' has method 'opEquals', but not 'toHash'.";
-			addErrorMessage(name.line, name.column, KEY, message);
+			string message = ad.ident.toString().dup;
+			message = "'" ~ message ~ "' has method 'opEquals', but not 'toHash'.";
+			addErrorMessage(cast(ulong) ad.loc.linnum, cast(ulong) ad.loc.charnum, KEY, message);
 		}
-		// Warn if has toHash, but not opEquals
 		else if (!hasOpEquals && hasToHash)
 		{
-			string message = "'" ~ name.text ~ "' has method 'toHash', but not 'opEquals'.";
-			addErrorMessage(name.line, name.column, KEY, message);
+			string message = ad.ident.toString().dup;
+			message = "'" ~ message ~ "' has method 'toHash', but not 'opEquals'.";
+			addErrorMessage(cast(ulong) ad.loc.linnum, cast(ulong) ad.loc.charnum, KEY, message);
 		}
 	}
 
-	enum string KEY = "dscanner.suspicious.incomplete_operator_overloading";
+	private enum KEY = "dscanner.suspicious.incomplete_operator_overloading";
 }
 
 unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
+	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.opequals_tohash_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		// Success because it has opEquals and toHash
 		class Chimp
 		{
