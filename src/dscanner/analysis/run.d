@@ -545,10 +545,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		analysisConfig.max_line_length,
 		analysisConfig.long_line_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!AutoRefAssignmentCheck(analysisConfig))
-		checks ~= new AutoRefAssignmentCheck(fileName,
-		analysisConfig.auto_ref_assignment_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!UselessAssertCheck(analysisConfig))
 		checks ~= new UselessAssertCheck(fileName,
 		analysisConfig.useless_assert_check == Check.skipTests && !ut);
@@ -676,6 +672,9 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 			fileName,
 			config.opequals_tohash_check == Check.skipTests && !ut
 		);
+		
+	if (moduleName.shouldRunDmd!(AutoRefAssignmentCheck!ASTBase)(config))
+		visitors ~= new AutoRefAssignmentCheck!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{
