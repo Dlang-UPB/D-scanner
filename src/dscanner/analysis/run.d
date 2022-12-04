@@ -480,10 +480,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new DuplicateAttributeCheck(fileName, moduleScope,
 		analysisConfig.duplicate_attribute == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!PokemonExceptionCheck(analysisConfig))
-		checks ~= new PokemonExceptionCheck(fileName, moduleScope,
-		analysisConfig.exception_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!FloatOperatorCheck(analysisConfig))
 		checks ~= new FloatOperatorCheck(fileName, moduleScope,
 		analysisConfig.float_operator_check == Check.skipTests && !ut);
@@ -676,6 +672,12 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 	
 	if (moduleName.shouldRunDmd!(BuiltinPropertyNameCheck!ASTBase)(config))
 		visitors ~= new BuiltinPropertyNameCheck!ASTBase(fileName);
+
+	if (moduleName.shouldRunDmd!(PokemonExceptionCheck!ASTBase)(config))
+		visitors ~= new PokemonExceptionCheck!ASTBase(
+			fileName,
+			config.exception_check == Check.skipTests && !ut
+		);
 
 	foreach (visitor; visitors)
 	{

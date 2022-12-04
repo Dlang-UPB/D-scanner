@@ -6,11 +6,8 @@
 module dscanner.analysis.pokemon;
 
 import std.stdio;
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
-import dsymbol.scope_ : Scope;
 
 /**
  * Checks for Pokémon exception handling, i.e. "gotta' catch 'em all".
@@ -23,64 +20,27 @@ import dsymbol.scope_ : Scope;
  * }
  * ---
  */
-final class PokemonExceptionCheck : BaseAnalyzer
+extern(C++) class PokemonExceptionCheck(AST) : BaseAnalyzerDmd!AST
 {
+	mixin AnalyzerInfo!"exception_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
+
+	extern(D) this(string fileName, bool skipTests = false)
+	{
+		super(fileName, skipTests);
+	}
+
+	override void visit(AST.Catch c)
+	{
+		if (c.type.isTypeIdentifier().ident.toString() == "Error" || 
+			c.type.isTypeIdentifier().ident.toString() == "Throwable")
+				addErrorMessage(cast(ulong) c.loc.linnum, cast(ulong) c.loc.charnum,
+								KEY, MESSAGE);
+	}
+
+private:
 	enum MESSAGE = "Catching Error or Throwable is almost always a bad idea.";
 	enum string KEY = "dscanner.suspicious.catch_em_all";
-	mixin AnalyzerInfo!"exception_check";
-
-	alias visit = BaseAnalyzer.visit;
-
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
-	{
-		super(fileName, sc, skipTests);
-	}
-
-	override void visit(const LastCatch lc)
-	{
-		addErrorMessage(lc.line, lc.column, KEY, MESSAGE);
-		lc.accept(this);
-	}
-
-	bool ignoreType = true;
-
-	override void visit(const Catch c)
-	{
-		ignoreType = false;
-		c.type.accept(this);
-		ignoreType = true;
-
-		c.accept(this);
-	}
-
-	override void visit(const Type2 type2)
-	{
-		if (ignoreType)
-			return;
-
-		if (type2.type !is null)
-		{
-			type2.type.accept(this);
-			return;
-		}
-
-		if (type2.typeIdentifierPart.typeIdentifierPart !is null)
-		{
-			return;
-		}
-		const identOrTemplate = type2.typeIdentifierPart.identifierOrTemplateInstance;
-		if (identOrTemplate.templateInstance !is null)
-		{
-			return;
-		}
-		if (identOrTemplate.identifier.text == "Throwable"
-				|| identOrTemplate.identifier.text == "Error")
-		{
-			immutable column = identOrTemplate.identifier.column;
-			immutable line = identOrTemplate.identifier.line;
-			addErrorMessage(line, column, KEY, MESSAGE);
-		}
-	}
 }
 
 unittest
@@ -89,7 +49,7 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.exception_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testCatch()
 		{
 			try
@@ -117,10 +77,6 @@ unittest
 
 			}
 			catch (shared(Error) err) // [warn]: Catching Error or Throwable is almost always a bad idea.
-			{
-
-			}
-			catch // [warn]: Catching Error or Throwable is almost always a bad idea.
 			{
 
 			}
