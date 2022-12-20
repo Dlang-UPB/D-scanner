@@ -89,6 +89,8 @@ import dsymbol.conversion.first;
 import dsymbol.conversion.second;
 import dsymbol.modulecache : ModuleCache;
 
+import dscanner.analysis.mylexer;
+
 import dscanner.utils;
 import dscanner.reports : DScannerJsonReporter, SonarQubeGenericIssueDataReporter;
 
@@ -258,9 +260,9 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		auto ast_m = new ASTBase.Module(fileName.toStringz, id, false, false);
 		auto input = cast(char[]) code;
 		input ~= '\0';
-		scope astbaseParser = new Parser!ASTBase(ast_m, input, false);
+		scope astbaseParser = new Parser!(ASTBase, MyLexer)(ast_m, input, false);
 		astbaseParser.nextToken();
-		ast_m.members = astbaseParser.parseModule();
+		ast_m.members = astbaseParser.parseModule();	
 
 		// Skip files that could not be read and continue with the rest
 		if (code.length == 0)
@@ -500,13 +502,13 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new MismatchedArgumentCheck(fileName, moduleScope,
 		analysisConfig.mismatched_args_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!NumberStyleCheck(analysisConfig))
-		checks ~= new NumberStyleCheck(fileName, moduleScope,
-		analysisConfig.number_style_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!RedundantParenCheck(analysisConfig))
 		checks ~= new RedundantParenCheck(fileName, moduleScope,
 		analysisConfig.redundant_parens_check == Check.skipTests && !ut);
+
+	if (moduleName.shouldRun!NumberStyleCheck(analysisConfig))
+		checks ~= new NumberStyleCheck(fileName, moduleScope,
+		analysisConfig.number_style_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!StyleChecker(analysisConfig))
 		checks ~= new StyleChecker(fileName, moduleScope,
