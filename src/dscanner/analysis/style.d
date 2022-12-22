@@ -5,157 +5,133 @@
 
 module dscanner.analysis.style;
 
-import std.stdio;
-import dparse.ast;
-import dparse.lexer;
-import std.regex;
-import std.array;
-import std.conv;
-import std.format;
-import dscanner.analysis.helpers;
 import dscanner.analysis.base;
-import dsymbol.scope_ : Scope;
+import dscanner.analysis.helpers;
+import std.stdio;
+import std.regex;
 
-final class StyleChecker : BaseAnalyzer
+
+extern(C++) class StyleChecker(AST) : BaseAnalyzerDmd!AST
 {
-	alias visit = ASTVisitor.visit;
-
-	enum string varFunNameRegex = `^([\p{Ll}_][_\w\d]*|[\p{Lu}\d_]+)$`;
-	enum string aggregateNameRegex = `^\p{Lu}[\w\d]*$`;
-	enum string moduleNameRegex = `^[\p{Ll}_\d]+$`;
-	enum string KEY = "dscanner.style.phobos_naming_convention";
 	mixin AnalyzerInfo!"style_check";
+	alias visit = BaseAnalyzerDmd!AST.visit;
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName, AST.ModuleDeclaration* ptrMd, bool skipTests = false)
 	{
-		super(fileName, sc, skipTests);
-	}
+		super(fileName, skipTests);
 
-	override void visit(const ModuleDeclaration dec)
-	{
-		foreach (part; dec.moduleName.identifiers)
+		if (ptrMd)
 		{
-			if (part.text.matchFirst(moduleNameRegex).length == 0)
-				addErrorMessage(part.line, part.column, KEY,
-						"Module/package name '" ~ part.text ~ "' does not match style guidelines.");
-		}
-	}
+			import std.conv : to;
 
-	// "extern (Windows) {}" : push visit pop
-	override void visit(const Declaration dec)
-	{
-		bool p;
-		if (dec.attributes)
-			foreach (attrib; dec.attributes)
-				if (const LinkageAttribute la = attrib.linkageAttribute)
-		{
-			p = true;
-			pushWinStyle(la.identifier.text.length && la.identifier.text == "Windows");
+			AST.ModuleDeclaration md = *ptrMd;
+
+			if (md.id.toString().matchFirst(moduleNameRegex).length == 0)
+				addErrorMessage(cast(ulong) md.loc.linnum, cast(ulong) md.loc.charnum, KEY,
+							to!string("Module/package name '" ~ md.id.toString() ~ "' does not match style guidelines."));
+
+			foreach (pkg; md.packages)
+			{
+				if (pkg.toString().matchFirst(moduleNameRegex).length == 0)
+					addErrorMessage(cast(ulong) md.loc.linnum, cast(ulong) md.loc.charnum, KEY,
+							to!string("Module/package name '" ~ pkg.toString() ~ "' does not match style guidelines."));
+			}
 		}
 
-		dec.accept(this);
-
-		if (p)
-			popWinStyle;
 	}
 
-	// "extern (Windows) :" : overwrite current
-	override void visit(const AttributeDeclaration dec)
+	override void visit(AST.LinkDeclaration ld)
 	{
-		if (dec.attribute && dec.attribute.linkageAttribute)
-		{
-			const LinkageAttribute la = dec.attribute.linkageAttribute;
-			_winStyles[$-1] = la.identifier.text.length && la.identifier.text == "Windows";
-		}
+		import dmd.astenums : LINK;
+
+		if (ld.decl)
+            foreach (de; *ld.decl)
+			{
+				auto fd = de.isFuncDeclaration();
+				if (fd && !fd.fbody && ld.linkage == LINK.windows)
+					continue;
+			
+				de.accept(this);
+			}
 	}
 
-	override void visit(const VariableDeclaration vd)
+	override void visit(AST.FuncDeclaration d)
 	{
-		vd.accept(this);
+		checkLowercaseName("Function", d);
+		super.visit(d);
 	}
 
-	override void visit(const Declarator dec)
+	override void visit(AST.VarDeclaration d)
 	{
-		checkLowercaseName("Variable", dec.name);
+		import dmd.astenums : STC;
+
+		// ditch enum variables as these have different style guidelines
+		if (!(d.storage_class & STC.manifest))
+			checkLowercaseName("Variable", d);
+		
+		super.visit(d);
 	}
 
-	override void visit(const FunctionDeclaration dec)
+	override void visit(AST.TemplateDeclaration d)
 	{
-		// "extern(Windows) Name();" push visit pop
-		bool p;
-		if (dec.attributes)
-			foreach (attrib; dec.attributes)
-				if (const LinkageAttribute la = attrib.linkageAttribute)
-		{
-			p = true;
-			pushWinStyle(la.identifier.text.length && la.identifier.text == "Windows");
-		}
-
-		if (dec.functionBody.specifiedFunctionBody ||
-			(dec.functionBody.missingFunctionBody && !winStyle()))
-				checkLowercaseName("Function", dec.name);
-
-		if (p)
-			popWinStyle;
+		checkLowercaseName("Template", d);
+		super.visit(d);
 	}
 
-	void checkLowercaseName(string type, ref const Token name)
+	override void visit(AST.ClassDeclaration d)
 	{
-		if (name.text.length > 0 && name.text.matchFirst(varFunNameRegex).length == 0)
-			addErrorMessage(name.line, name.column, KEY,
-					type ~ " name '" ~ name.text ~ "' does not match style guidelines.");
+		checkAggregateName("Class", d);
+		super.visit(d);
 	}
 
-	override void visit(const ClassDeclaration dec)
+	override void visit(AST.StructDeclaration d)
 	{
-		checkAggregateName("Class", dec.name);
-		dec.accept(this);
+		checkAggregateName("Struct", d);
+		super.visit(d);
 	}
 
-	override void visit(const InterfaceDeclaration dec)
+	override void visit(AST.InterfaceDeclaration d)
 	{
-		checkAggregateName("Interface", dec.name);
-		dec.accept(this);
+		checkAggregateName("Interface", d);
+		super.visit(d);
 	}
 
-	override void visit(const EnumDeclaration dec)
+	override void visit(AST.UnionDeclaration d)
 	{
-		if (dec.name.text is null || dec.name.text.length == 0)
-			return;
-		checkAggregateName("Enum", dec.name);
-		dec.accept(this);
+		checkAggregateName("Union", d);
+		super.visit(d);
 	}
 
-	override void visit(const StructDeclaration dec)
+	override void visit(AST.EnumDeclaration d)
 	{
-		checkAggregateName("Struct", dec.name);
-		dec.accept(this);
+		checkAggregateName("Enum", d);
+		super.visit(d);
 	}
 
-	void checkAggregateName(string aggregateType, ref const Token name)
+	extern(D) void checkLowercaseName(string type, AST.Dsymbol d)
 	{
-		if (name.text.length > 0 && name.text.matchFirst(aggregateNameRegex).length == 0)
-			addErrorMessage(name.line, name.column, KEY,
-					aggregateType ~ " name '" ~ name.text ~ "' does not match style guidelines.");
+		import std.conv : to;
+
+		if (d.ident && d.ident.toString().matchFirst(varFunNameRegex).length == 0)
+			addErrorMessage(cast(ulong) d.loc.linnum, cast(ulong) d.loc.charnum, KEY,
+							to!string(type ~ " name '" ~ d.ident.toString() ~ "' does not match style guidelines."));
 	}
 
-	bool[] _winStyles = [false];
-
-	bool winStyle()
+	extern(D) void checkAggregateName(string aggregateType, AST.ScopeDsymbol d)
 	{
-		return _winStyles[$-1];
+
+		import std.conv : to;
+
+		if (d.ident && d.ident.toString().matchFirst(aggregateNameRegex).length == 0)
+			addErrorMessage(cast(ulong) d.loc.linnum, cast(ulong) d.loc.charnum, KEY,
+							to!string(aggregateType ~ " name '" ~ d.ident.toString() ~ "' does not match style guidelines."));
 	}
 
-	void pushWinStyle(const bool value)
-	{
-		_winStyles.length += 1;
-		_winStyles[$-1] = value;
-	}
-
-	void popWinStyle()
-	{
-		_winStyles.length -= 1;
-	}
+	private:
+		enum KEY = "dscanner.suspicious.style_check";
+		enum varFunNameRegex = `^([\p{Ll}_][_\w\d]*|[\p{Lu}\d_]+)$`;
+		enum aggregateNameRegex = `^\p{Lu}[\w\d]*$`;
+		enum moduleNameRegex = `^[\p{Ll}_\d]+$`;
 }
 
 unittest
@@ -164,6 +140,8 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.style_check = Check.enabled;
+
+	alias assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
 
 	assertAnalyzerWarnings(q{
 		module AMODULE; // [warn]: Module/package name 'AMODULE' does not match style guidelines.

@@ -262,6 +262,10 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		astbaseParser.nextToken();
 		ast_m.members = astbaseParser.parseModule();
 
+		// auto md = *astbaseParser.md;
+		// writeln(md.id.toString());
+		// writeln(md.packages);
+
 		// Skip files that could not be read and continue with the rest
 		if (code.length == 0)
 			continue;
@@ -275,7 +279,11 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (errorCount > 0 || (staticAnalyze && warningCount > 0))
 			hasErrors = true;
 		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, staticAnalyze);
-		MessageSet resultsDmd = analyzeDmd(fileName, ast_m, getModuleName(astbaseParser.md), config);
+		
+		ASTBase.ModuleDeclaration dummy;
+		
+		MessageSet resultsDmd = analyzeDmd(fileName, ast_m, getModuleName(astbaseParser.md), config, astbaseParser.md);
+
 		foreach (result; resultsDmd[])
 		{
 			results.insert(result);
@@ -508,10 +516,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new RedundantParenCheck(fileName, moduleScope,
 		analysisConfig.redundant_parens_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!StyleChecker(analysisConfig))
-		checks ~= new StyleChecker(fileName, moduleScope,
-		analysisConfig.style_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!UndocumentedDeclarationCheck(analysisConfig))
 		checks ~= new UndocumentedDeclarationCheck(fileName, moduleScope,
 		analysisConfig.undocumented_declaration_check == Check.skipTests && !ut);
@@ -608,7 +612,8 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	return set;
 }
 
-MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName, const StaticAnalysisConfig config)
+MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName,
+					const StaticAnalysisConfig config, ASTBase.ModuleDeclaration* md)
 {
 	MessageSet set = new MessageSet;
 	BaseAnalyzerDmd!ASTBase[] visitors;
@@ -677,6 +682,13 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 		visitors ~= new BackwardsRangeCheck!ASTBase(
 			fileName,
 			config.backwards_range_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(StyleChecker!ASTBase)(config))
+		visitors ~= new StyleChecker!ASTBase(
+			fileName,
+			md,
+			config.style_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)

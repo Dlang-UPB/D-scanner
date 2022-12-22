@@ -176,7 +176,7 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 	scope astbaseParser = new Parser!ASTBase(ast_m, input, false);
 	astbaseParser.nextToken();
 	ast_m.members = astbaseParser.parseModule();
-	MessageSet rawWarnings = analyzeDmd("test.txt", ast_m, getModuleName(astbaseParser.md), config);
+	MessageSet rawWarnings = analyzeDmd("test.txt", ast_m, getModuleName(astbaseParser.md), config, astbaseParser.md);
 
 	string[] codeLines = code.splitLines();
 
