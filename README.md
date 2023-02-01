@@ -1,4 +1,9 @@
 # D-Scanner fork that uses dmd as a library (WIP)
+# D-Scanner
+
+[![CI status](https://github.com/dlang-community/D-Scanner/actions/workflows/default.yml/badge.svg)](https://github.com/dlang-community/D-Scanner/actions?query=workflow%3A%22run+tests%22)
+[![Latest version](https://img.shields.io/dub/v/dscanner.svg)](http://code.dlang.org/packages/dscanner)
+[![License](https://img.shields.io/dub/l/dscanner.svg)](http://code.dlang.org/packages/dscanner)
 
 D-Scanner is a tool for analyzing D source code
 
