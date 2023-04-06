@@ -13,9 +13,10 @@ import dparse.lexer;
 /**
  * Checks for incorrect infinite range definitions
  */
-extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	// alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	mixin AnalyzerInfo!"incorrect_infinite_range_check";
 
@@ -60,7 +61,7 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 		{
 			AST.IntegerExp ie = cast(AST.IntegerExp) rs.exp;
 
-			if (ie && ie.value == 0)
+			if (ie && ie.getInteger() == 0)
 				addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
 				"Use `enum bool empty = false;` to define an infinite range.");
 		}
@@ -74,7 +75,7 @@ extern(C++) class IncorrectInfiniteRangeCheck(AST) : BaseAnalyzerDmd!AST
 		{
 			AST.IntegerExp ie = cast(AST.IntegerExp) rs1.exp;
 
-			if (ie && ie.value == 0)
+			if (ie && ie.getInteger() == 0)
 				addErrorMessage(cast(ulong) fd.loc.linnum, cast(ulong) fd.loc.charnum, KEY,
 				"Use `enum bool empty = false;` to define an infinite range.");
 		}

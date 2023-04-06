@@ -29,6 +29,14 @@ set DSYMBOL=
 set CONTAINERS=
 set LIBDDOC=
 
+set DMD_FRONTEND_SRC=
+for /r dmd\compiler\src\dmd\common %%x in (*.d) do set DMD_FRONTEND_SRC=!DMD_FRONTEND_SRC! %%x
+for /r dmd\compiler\src\dmd\root %%x in (*.d) do set DMD_FRONTEND_SRC=!DMD_FRONTEND_SRC! %%x
+for /r dmd\compiler\src\dmd\backend %%x in (*.d) do set DMD_FRONTEND_SRC=!DMD_FRONTEND_SRC! %%x
+for /r dmd\compiler\src\dmd %%x in (*.d) do (
+	if not "%%~nx" == "mars" set DMD_FRONTEND_SRC=!DMD_FRONTEND_SRC! %%x
+)
+
 set DMD_ROOT_SRC=
 for %%x in (dmd\compiler\src\dmd\common\*.d) do set DMD_ROOT_SRC=!DMD_ROOT_SRC! %%x
 for %%x in (dmd\compiler\src\dmd\root\*.d) do set DMD_ROOT_SRC=!DMD_ROOT_SRC! %%x
@@ -79,9 +87,7 @@ if "%1" == "test" goto test_cmd
 	%INIFILED%^
 	%DSYMBOL%^
 	%CONTAINERS%^
-	%DMD_ROOT_SRC%^
-	%DMD_LEXER_SRC%^
-	%DMD_PARSER_SRC%^
+	%DMD_FRONTEND_SRC%^
 	%DFLAGS%^
 	-I"libdparse\src"^
 	-I"DCD\dsymbol\src"^
@@ -102,9 +108,7 @@ set TESTNAME="bin\dscanner-unittest"
 	%INIFILED%^
 	%DSYMBOL%^
 	%CONTAINERS%^
-	%DMD_ROOT_SRC%^
-	%DMD_LEXER_SRC%^
-	%DMD_PARSER_SRC%^
+	%DMD_FRONTEND_SRC%^
 	-I"libdparse\src"^
 	-I"DCD\dsymbol\src"^
 	-I"containers\src"^

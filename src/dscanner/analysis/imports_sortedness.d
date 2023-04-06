@@ -9,12 +9,13 @@ import dscanner.analysis.base;
 /**
  * Checks the sortedness of module imports
  */
-extern(C++) class ImportSortednessCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class ImportSortednessCheck(AST) : BaseAnalyzerDmd
 {
 	enum string KEY = "dscanner.style.imports_sortedness";
 	enum string MESSAGE = "The imports are not sorted in alphabetical order";
 	mixin AnalyzerInfo!"imports_sortedness";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
+	// alias visit = BaseAnalyzerDmd!AST.visit;
 
 	///
 	extern(D) this(string fileName)

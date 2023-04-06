@@ -10,10 +10,10 @@ import dscanner.analysis.base;
 /**
  * Checks for assignment to auto-ref function parameters.
  */
-extern(C++) class AutoRefAssignmentCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class AutoRefAssignmentCheck(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"auto_ref_assignment_check";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	mixin ScopedVisit!(AST.ClassDeclaration);
 	mixin ScopedVisit!(AST.StructDeclaration);

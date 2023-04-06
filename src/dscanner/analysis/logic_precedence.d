@@ -15,11 +15,11 @@ import dscanner.analysis.helpers;
  * if (a && (b || c)) // good
  * ---
  */
-extern(C++) class LogicPrecedenceCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class LogicPrecedenceCheck(AST) : BaseAnalyzerDmd
 {
 	enum string KEY = "dscanner.confusing.logical_precedence";
 	mixin AnalyzerInfo!"logical_precedence_check";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	extern(D) this(string fileName, bool skipTests = false)
 	{

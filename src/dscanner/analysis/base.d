@@ -9,6 +9,9 @@ import dmd.transitivevisitor;
 import core.stdc.string;
 import std.conv : to;
 
+import dmd.visitor;
+import dmd.func;
+
 struct Message
 {
 	/// Name of the file where the warning was triggered
@@ -112,9 +115,9 @@ protected:
  * Visitor that implements the AST traversal logic.
  * Supports collecting error messages
  */
-extern(C++) class BaseAnalyzerDmd(AST) : ParseTimeTransitiveVisitor!AST
+extern(C++) class BaseAnalyzerDmd : SemanticTimeTransitiveVisitor
 {
-	alias visit = ParseTimeTransitiveVisitor!AST.visit;
+	alias visit = SemanticTimeTransitiveVisitor.visit;
 
 	extern(D) this(string fileName, bool skipTests = false)
 	{
@@ -137,7 +140,7 @@ extern(C++) class BaseAnalyzerDmd(AST) : ParseTimeTransitiveVisitor!AST
 		return _messages[].array;
 	}
 
-	override void visit(AST.UnitTestDeclaration ud)
+	override void visit(UnitTestDeclaration ud)
 	{
 		if (!skipTests)
 			super.visit(ud);

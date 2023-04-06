@@ -17,9 +17,10 @@
     "inifiled" : "~>1.3.1",
     "emsi_containers" : "~>0.9.0",
     "libddoc" : "~>0.8.0",
-    "dmd:root": "~master",
-    "dmd:lexer": "~master",
-    "dmd:parser": "~master"
+    "dmd": {
+      "repository": "git+https://github.com/dlang/dmd.git",
+      "version": "0c361b6c571ad56c843738b2aeb4a86540224114"
+    }
   },
   "targetPath" : "bin",
   "stringImportPaths" : [

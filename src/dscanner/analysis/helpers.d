@@ -21,6 +21,8 @@ import std.experimental.allocator;
 
 import dmd.parse : Parser;
 import dmd.astbase : ASTBase;
+import dmd.astcodegen;
+import dmd.frontend;
 
 S between(S)(S value, S before, S after) if (isSomeString!S)
 {
@@ -143,40 +145,46 @@ void assertAnalyzerWarnings(string code, const StaticAnalysisConfig config,
 void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 		string file = __FILE__, size_t line = __LINE__)
 {
-	import dmd.parse : Parser;
-	import dmd.astbase : ASTBase;
-	import dmd.id : Id;
+	// import dmd.parse : Parser;
+	// import dmd.astbase : ASTBase;
+	// import dmd.id : Id;
 	import dmd.globals : global;
-	import dmd.identifier : Identifier;
-	import std.string : toStringz;
+	// import dmd.identifier : Identifier;
+	// import std.string : toStringz;
 	import dscanner.utils : getModuleName;
 	import std.file : remove, exists;
 	import std.stdio : File;
+	import std.path : dirName;
+	import dmd.arraytypes : Strings;
 
-	Id.initialize();
-	global._init();
-	global.params.useUnitTests = true;
-	ASTBase.Type._init();
+	import std.stdio : File;
+	import std.file : exists, remove;
 
 	auto deleteme = "test.txt";
-	File temp = File(deleteme, "w");
+	File f = File(deleteme, "w");
 	scope(exit)
 	{
 		assert(exists(deleteme));
-		remove(deleteme);
+        remove(deleteme);
 	}
 
-	temp.write(code);
-	temp.close();
+	f.write(code);
+	f.close();
 
-	auto id = Identifier.idPool(file);
-	auto ast_m = new ASTBase.Module(file.toStringz, id, false, false);
-	char[] input = code.dup;
+	auto dmdParentDir = dirName(dirName(dirName(dirName(__FILE_FULL_PATH__))));
+
+	global.params.useUnitTests = true;
+	global.path = new Strings();
+	global.path.push((dmdParentDir ~ "/dmd").ptr);
+	global.path.push((dmdParentDir ~ "/dmd/druntime/src").ptr);
+
+	initDMD();
+
+	auto input = cast(char[]) code;
 	input ~= '\0';
-	scope astbaseParser = new Parser!ASTBase(ast_m, input, false);
-	astbaseParser.nextToken();
-	ast_m.members = astbaseParser.parseModule();
-	MessageSet rawWarnings = analyzeDmd("test.txt", ast_m, getModuleName(astbaseParser.md), config);
+	auto t = dmd.frontend.parseModule(cast(const(char)[]) file, cast(const (char)[]) input);		
+	
+	MessageSet rawWarnings = analyzeDmd("test.txt", t.module_, getModuleName(t.module_.md), config);
 
 	string[] codeLines = code.splitLines();
 

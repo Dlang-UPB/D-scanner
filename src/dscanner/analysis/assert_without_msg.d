@@ -10,10 +10,10 @@ import std.stdio;
 /**
  * Check that all asserts have an explanatory message.
  */
-extern(C++) class AssertWithoutMessageCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class AssertWithoutMessageCheck(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"assert_without_msg";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	///
 	extern(D) this(string fileName, bool skipTests = false)
@@ -38,7 +38,7 @@ extern(C++) class AssertWithoutMessageCheck(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.StaticAssert ae)
 	{
-		if (!ae.msg)
+		if (!ae.msgs)
 			addErrorMessage(ae.loc.linnum, ae.loc.charnum, KEY, MESSAGE);
 	}
 

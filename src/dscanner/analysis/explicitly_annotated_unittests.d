@@ -10,10 +10,10 @@ import dscanner.analysis.helpers;
 /**
  * Requires unittests to be explicitly annotated with either @safe or @system
  */
-extern(C++) class ExplicitlyAnnotatedUnittestCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class ExplicitlyAnnotatedUnittestCheck(AST) : BaseAnalyzerDmd
 {
     mixin AnalyzerInfo!"explicitly_annotated_unittests";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	extern(D) this(string fileName)
 	{
@@ -23,7 +23,7 @@ extern(C++) class ExplicitlyAnnotatedUnittestCheck(AST) : BaseAnalyzerDmd!AST
 	override void visit(AST.UnitTestDeclaration d)
 	{
 		import dmd.astenums : STC;
-	
+
 		if (!(d.storage_class & STC.safe || d.storage_class & STC.system))
 			addErrorMessage(cast(ulong) d.loc.linnum, cast(ulong) d.loc.charnum,
 					KEY, MESSAGE);

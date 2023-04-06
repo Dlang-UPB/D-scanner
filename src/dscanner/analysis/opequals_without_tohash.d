@@ -12,10 +12,10 @@ import dscanner.analysis.helpers;
  * Checks for when a class/struct has the method opEquals without toHash, or
  * toHash without opEquals.
  */
-extern(C++) class OpEqualsWithoutToHashCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class OpEqualsWithoutToHashCheck(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"opequals_tohash_check";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	extern(D) this(string fileName, bool skipTests = false)
 	{
