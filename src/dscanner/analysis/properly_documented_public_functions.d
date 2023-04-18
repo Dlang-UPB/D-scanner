@@ -52,7 +52,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 
 	override void visit(AST.Catch c)
 	{
-		// writeln("INTRA AICI IN CATCH");
 		import std.algorithm.iteration : filter;
 		import std.array : array;
 
@@ -152,6 +151,8 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 				tlParams ~= to!string(p.ident.toString());
 			}
 
+
+
 		super.visit(d);
 
 		if (d.visibility.kind == Visibility.Kind.public_)
@@ -186,7 +187,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 			if (tf)
 				foreach (idx, p; tf.parameterList)
 				{
-					// writeln(p.ident.toString());
 
 					if (!paramSection.empty &&
 						!canFind(paramSection[0].mapping.map!(a => a[0]).array, to!string(p.ident.toString())) &&
@@ -206,7 +206,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 					// 	tlParams ~= to!string(ti.ident.toString());
 				}
 
-			// writeln("INTRA AICI");
             //printf("IN EPONYMOUS MEMBER FUNC DECL\n");
             assert(fd.type);
             visitFunctionType(fd.type.isTypeFunction(), d);
