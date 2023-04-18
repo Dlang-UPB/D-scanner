@@ -52,12 +52,8 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 
 	override void visit(AST.Catch c)
 	{
-		// writeln("INTRA AICI IN CATCH");
 		import std.algorithm.iteration : filter;
 		import std.array : array;
-
-		// writeln(thrown);
-		// writeln(to!string(c.type.toChars()));
 
 		thrown = thrown.filter!(a => a != to!string(c.type.toChars())).array;
 		super.visit(c);
@@ -169,8 +165,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 		import std.algorithm.iteration : map, filter;
 		import std.array : array;
 
-		// writeln("IN MY VISIT EPONYMOUS MEMBER");
-        //printf("Visiting EponymousMember\n");
         if (!d.members || d.members.length != 1)
             return false;
         AST.Dsymbol onemember = (*d.members)[0];
@@ -186,7 +180,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 			if (tf)
 				foreach (idx, p; tf.parameterList)
 				{
-					// writeln(p.ident.toString());
 
 					if (!paramSection.empty &&
 						!canFind(paramSection[0].mapping.map!(a => a[0]).array, to!string(p.ident.toString())) &&
@@ -201,13 +194,8 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 
 					tlParams = tlParams.filter!(a => a != to!string(ti.ident.toString())).array;
 					lastSeenFun.params[to!string(ti.ident.toString())] = true;
-
-					// if (!canFind(tlParams, to!string(ti.ident.toString())))
-					// 	tlParams ~= to!string(ti.ident.toString());
 				}
 
-			// writeln("INTRA AICI");
-            //printf("IN EPONYMOUS MEMBER FUNC DECL\n");
             assert(fd.type);
             visitFunctionType(fd.type.isTypeFunction(), d);
             if (d.constraint)
@@ -219,7 +207,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 
         if (AST.AggregateDeclaration ad = onemember.isAggregateDeclaration())
         {
-            //printf("IN EPONYMOUS MEMBER AGGREGATE DECL\n");
             visitTemplateParameters(d.parameters);
             if (d.constraint)
                 d.constraint.accept(this);
@@ -234,7 +221,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 
         if (AST.VarDeclaration vd = onemember.isVarDeclaration())
         {
-            //printf("IN EPONYMOUS MEMBER VAR DECL\n");
             if (d.constraint)
                 return false;
             if (vd.type)
@@ -297,9 +283,7 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 		return comment;
 	}
 
-	// tl params denumiri template care vin de la argumente, tl list toate template urile
-	extern(D) void checkDdocParams(size_t line, size_t column, string[] params,
-						string[] tlParams)
+	extern(D) void checkDdocParams(size_t line, size_t column, string[] params, string[] tlParams)
 	{
 		import std.array : array;
 		import std.algorithm.searching : canFind, countUntil;
