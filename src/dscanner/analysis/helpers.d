@@ -142,7 +142,7 @@ void assertAnalyzerWarnings(string code, const StaticAnalysisConfig config,
 	}
 }
 
-void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
+void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config, bool semantic = false,
 		string file = __FILE__, size_t line = __LINE__)
 {
 	// import dmd.parse : Parser;
@@ -183,7 +183,9 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 	auto input = cast(char[]) code;
 	input ~= '\0';
 	auto t = dmd.frontend.parseModule(cast(const(char)[]) file, cast(const (char)[]) input);		
-	
+	if (semantic)
+		t.module_.fullSemantic();
+
 	MessageSet rawWarnings = analyzeDmd("test.txt", t.module_, getModuleName(t.module_.md), config);
 
 	string[] codeLines = code.splitLines();
