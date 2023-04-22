@@ -534,10 +534,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		analysisConfig.max_line_length,
 		analysisConfig.long_line_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!UselessAssertCheck(analysisConfig))
-		checks ~= new UselessAssertCheck(fileName,
-		analysisConfig.useless_assert_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!StaticIfElse(analysisConfig))
 		checks ~= new StaticIfElse(fileName,
 		analysisConfig.static_if_else_check == Check.skipTests && !ut);
@@ -686,6 +682,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new UnmodifiedFinder!ASTCodegen(
 			fileName,
 			config.could_be_immutable_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(UselessAssertCheck!ASTCodegen)(config))
+		visitors ~= new UselessAssertCheck!ASTCodegen(
+			fileName,
+			config.useless_assert_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
