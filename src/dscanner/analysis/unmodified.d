@@ -5,338 +5,212 @@
 module dscanner.analysis.unmodified;
 
 import dscanner.analysis.base;
-import dscanner.utils : safeAccess;
-import dsymbol.scope_ : Scope;
 import std.container;
-import dparse.ast;
-import dparse.lexer;
 
 /**
  * Checks for variables that could have been declared const or immutable
  */
-final class UnmodifiedFinder : BaseAnalyzer
+extern(C++) class UnmodifiedFinder(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzer.visit;
-
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"could_be_immutable_check";
 
-	///
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName, bool skipTests = false)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const Module mod)
+	override void visit(AST.Module m)
 	{
 		pushScope();
-		mod.accept(this);
+		super.visit(m);
 		popScope();
 	}
 
-	override void visit(const BlockStatement blockStatement)
+	override void visit(AST.VarDeclaration d)
 	{
-		pushScope();
-		blockStatementDepth++;
-		blockStatement.accept(this);
-		blockStatementDepth--;
-		popScope();
-	}
+		import dmd.astenums : STC, MODFlags;
+		import std.algorithm.searching : startsWith;
+		import std.conv : to;
 
-	override void visit(const StructBody structBody)
-	{
-		pushScope();
-		immutable oldBlockStatementDepth = blockStatementDepth;
-		blockStatementDepth = 0;
-		structBody.accept(this);
-		blockStatementDepth = oldBlockStatementDepth;
-		popScope();
-	}
+		if (tree.length == 1)
+			return;
 
-	override void visit(const VariableDeclaration dec)
-	{
-		if (dec.autoDeclaration is null && blockStatementDepth > 0
-				&& isImmutable <= 0 && !canFindImmutable(dec))
+		if (d.storage_class & STC.auto_)
+			return;
+
+		/* If variable is already declared const/immutable/enum, the entire scope
+		 *	is declared const/immutable, or the variable is a property of an aggregate,
+		 *	there is no need to investigate it
+		 */
+		if (d.storage_class & STC.immutable_ || d.storage_class & STC.const_ ||
+			d.storage_class & STC.manifest|| inAggregate || isImmutable ||
+			(d.type && (d.type.isConst() || d.type.isImmutable())))
+				return;
+
+		/* Do the same check for pointer types */
+		if (d.type)
 		{
-			foreach (d; dec.declarators)
-			{
-				if (initializedFromCast(d.initializer))
-					continue;
-				if (initializedFromNew(d.initializer))
-					continue;
-				tree[$ - 1].insert(new VariableInfo(d.name.text, d.name.line,
-						d.name.column, isValueTypeSimple(dec.type)));
-			}
-		}
-		dec.accept(this);
-	}
+			auto tp = d.type.isTypePointer();
 
-	override void visit(const AutoDeclaration autoDeclaration)
-	{
-		import std.algorithm : canFind;
-
-		if (blockStatementDepth > 0 && isImmutable <= 0
-				&& (!autoDeclaration.storageClasses.canFind!(a => a.token == tok!"const"
-					|| a.token == tok!"enum" || a.token == tok!"immutable")))
-		{
-			foreach (part; autoDeclaration.parts)
-			{
-				if (initializedFromCast(part.initializer))
-					continue;
-				if (initializedFromNew(part.initializer))
-					continue;
-				tree[$ - 1].insert(new VariableInfo(part.identifier.text,
-						part.identifier.line, part.identifier.column));
-			}
-		}
-		autoDeclaration.accept(this);
-	}
-
-	override void visit(const AssignExpression assignExpression)
-	{
-		if (assignExpression.operator != tok!"")
-		{
-			interest++;
-			guaranteeUse++;
-			assignExpression.ternaryExpression.accept(this);
-			guaranteeUse--;
-			interest--;
-
-			if (assignExpression.operator == tok!"~=")
-				interest++;
-			assignExpression.expression.accept(this);
-			if (assignExpression.operator == tok!"~=")
-				interest--;
-		}
-		else
-			assignExpression.accept(this);
-	}
-
-	override void visit(const Declaration dec)
-	{
-		if (canFindImmutableOrConst(dec))
-		{
-			isImmutable++;
-			dec.accept(this);
-			isImmutable--;
-		}
-		else
-			dec.accept(this);
-	}
-
-	override void visit(const IdentifierChain ic)
-	{
-		if (ic.identifiers.length && interest > 0)
-			variableMightBeModified(ic.identifiers[0].text);
-		ic.accept(this);
-	}
-
-	override void visit(const IdentifierOrTemplateInstance ioti)
-	{
-		if (ioti.identifier != tok!"" && interest > 0)
-			variableMightBeModified(ioti.identifier.text);
-		ioti.accept(this);
-	}
-
-	mixin PartsMightModify!AsmPrimaryExp;
-	mixin PartsMightModify!IndexExpression;
-	mixin PartsMightModify!FunctionCallExpression;
-	mixin PartsMightModify!NewExpression;
-	mixin PartsMightModify!IdentifierOrTemplateChain;
-	mixin PartsMightModify!ReturnStatement;
-
-	override void visit(const UnaryExpression unary)
-	{
-		if (unary.prefix == tok!"++" || unary.prefix == tok!"--"
-				|| unary.suffix == tok!"++" || unary.suffix == tok!"--"
-				|| unary.prefix == tok!"*" || unary.prefix == tok!"&")
-		{
-			interest++;
-			guaranteeUse++;
-			unary.accept(this);
-			guaranteeUse--;
-			interest--;
-		}
-		else
-			unary.accept(this);
-	}
-
-	override void visit(const ForeachStatement foreachStatement)
-	{
-		if (foreachStatement.low !is null)
-		{
-			interest++;
-			foreachStatement.low.accept(this);
-			interest--;
-		}
-		if (foreachStatement.declarationOrStatement !is null)
-			foreachStatement.declarationOrStatement.accept(this);
-	}
-
-	override void visit(const TraitsExpression)
-	{
-		// issue #266: Ignore unmodified variables inside of `__traits` expressions
-	}
-
-	override void visit(const TypeofExpression)
-	{
-		// issue #270: Ignore unmodified variables inside of `typeof` expressions
-	}
-
-	override void visit(const AsmStatement a)
-	{
-		inAsm = true;
-		a.accept(this);
-		inAsm = false;
-	}
-
-private:
-
-	template PartsMightModify(T)
-	{
-		override void visit(const T t)
-		{
-			interest++;
-			t.accept(this);
-			interest--;
-		}
-	}
-
-	void variableMightBeModified(string name)
-	{
-		size_t index = tree.length - 1;
-		auto vi = VariableInfo(name);
-		if (guaranteeUse == 0)
-		{
-			auto r = tree[index].equalRange(&vi);
-			if (!r.empty && r.front.isValueType && !inAsm)
+			if (tp && tp.next && (tp.next.isConst() || tp.next.isImmutable()))
 				return;
 		}
-		while (true)
-		{
-			if (tree[index].removeKey(&vi) != 0 || index == 0)
-				break;
-			index--;
-		}
+
+		/* Also ditch variables initialized with `new` or `cast` */
+		if (d._init && (startsWith(to!string(d._init.toChars()), "new") ||
+						startsWith(to!string(d._init.toChars()), "cast")))
+							return;
+
+		tree[$ - 1].insert(new VariableInfo(d.ident.toString().dup, d.loc.linnum,
+						d.loc.charnum, false));
+
+		super.visit(d);
 	}
 
-	bool initializedFromNew(const Initializer initializer)
+	override void visit(AST.ReturnStatement s)
 	{
-		if (const UnaryExpression ue = cast(UnaryExpression) safeAccess(initializer)
-			.nonVoidInitializer.assignExpression)
-		{
-			return ue.newExpression !is null;
-		}
-		return false;
+		if (s.exp) if (auto ie = s.exp.isIdentifierExp())
+			variableMightBeModified(ie.ident.toString().dup);
 	}
 
-	bool initializedFromCast(const Initializer initializer)
+	override void visit(AST.CallExp e)
 	{
-		import std.typecons : scoped;
+		if (e.arguments)
+			foreach(exp; *e.arguments)
+				if (auto ie = exp.isIdentifierExp()) variableMightBeModified(ie.ident.toString().dup);
+				
 
-		static class CastFinder : ASTVisitor
+		super.visit(e);
+	}
+
+	override void visit(AST.NewExp e)
+	{
+		if (e.arguments)
+			foreach(exp; *e.arguments)
+				if (auto ie = exp.isIdentifierExp()) variableMightBeModified(ie.ident.toString().dup); 
+
+		super.visit(e);
+	}
+
+	static foreach (node; varChangingNodes)
+				mixin VariableChanged!(mixin(node));
+
+	static foreach (node; aggregateNodes)
+				mixin InAggregate!(mixin(node));
+
+	static foreach (node; scopedVisitNodes)
+				mixin ScopedVisit!(mixin(node));
+
+	private enum KEY = "dscanner.performance.enum_array_literal";
+
+	private:
+		template VariableChanged(T)
 		{
-			alias visit = ASTVisitor.visit;
-			override void visit(const CastExpression castExpression)
+			override void visit(T t)
 			{
-				foundCast = true;
-				castExpression.accept(this);
-			}
+				/* Handle a[] = ... */
+				if (auto ae = t.e1.isArrayExp()) if (auto ie = ae.e1.isIdentifierExp())
+					variableMightBeModified(ie.ident.toString().dup);
 
-			bool foundCast;
-		}
+				if (auto ie = t.e1.isIdentifierExp())
+					variableMightBeModified(ie.ident.toString().dup);
 
-		if (initializer is null)
-			return false;
-		auto finder = scoped!CastFinder();
-		finder.visit(initializer);
-		return finder.foundCast;
-	}
-
-	bool canFindImmutableOrConst(const Declaration dec)
-	{
-		import std.algorithm : canFind, map, filter;
-
-		return !dec.attributes.map!(a => a.attribute)
-			.filter!(a => a == tok!"immutable" || a == tok!"const").empty;
-	}
-
-	bool canFindImmutable(const VariableDeclaration dec)
-	{
-		import std.algorithm : canFind;
-
-		foreach (storageClass; dec.storageClasses)
-		{
-			if (storageClass.token == tok!"enum")
-				return true;
-		}
-		foreach (sc; dec.storageClasses)
-		{
-			if (sc.token == tok!"immutable" || sc.token == tok!"const")
-				return true;
-		}
-		if (dec.type !is null)
-		{
-			foreach (tk; dec.type.typeConstructors)
-				if (tk == tok!"immutable" || tk == tok!"const")
-					return true;
-			if (dec.type.type2)
-			{
-				const tk = dec.type.type2.typeConstructor;
-				if (tk == tok!"immutable" || tk == tok!"const")
-					return true;
+				super.visit(t);
 			}
 		}
-		return false;
-	}
 
-	static struct VariableInfo
-	{
-		string name;
-		size_t line;
-		size_t column;
-		bool isValueType;
-	}
-
-	void popScope()
-	{
-		foreach (vi; tree[$ - 1])
+		template InAggregate(T)
 		{
-			immutable string errorMessage = "Variable " ~ vi.name
-				~ " is never modified and could have been declared const or immutable.";
-			addErrorMessage(vi.line, vi.column, "dscanner.suspicious.unmodified", errorMessage);
+			override void visit(T t)
+			{
+				pushScope();
+				immutable oldInAggregate = inAggregate;
+				inAggregate = 1;
+				super.visit(t);
+				inAggregate = oldInAggregate;
+				popScope();
+			}
 		}
-		tree = tree[0 .. $ - 1];
-	}
 
-	void pushScope()
-	{
-		tree ~= new RedBlackTree!(VariableInfo*, "a.name < b.name");
-	}
+		template ScopedVisit(T)
+		{
+			override void visit(T t)
+			{
+				pushScope();
+				immutable oldInAggregate = inAggregate;
+				inAggregate = 0;
+				super.visit(t);
+				inAggregate = oldInAggregate;
+				popScope();
+			}
+		}
 
-	int blockStatementDepth;
+		extern(D) static immutable varChangingNodes = ["AST.AssignExp", "AST.PostExp", "AST.PreExp", "AST.CatAssignExp",
+						"AST.AddAssignExp", "AST.MinAssignExp", "AST.MulAssignExp", "AST.DivAssignExp", "AST.ModAssignExp",
+						"AST.AndAssignExp", "AST.OrAssignExp", "AST.XorAssignExp", "AST.PowAssignExp", "AST.ShlAssignExp",
+						"AST.ShrAssignExp", "AST.UshrAssignExp", "AST.DotIdExp"];
 
-	int interest;
+		extern(D) static immutable aggregateNodes = ["AST.ClassDeclaration", "AST.StructDeclaration", "AST.UnionDeclaration",
+									"AST.TemplateDeclaration"];
 
-	int guaranteeUse;
+		extern(D) static immutable scopedVisitNodes = ["AST.FuncDeclaration", "AST.IfStatement", "AST.WhileStatement",
+									"AST.ForStatement", "AST.ForeachStatement", "AST.ScopeStatement"];
 
-	int isImmutable;
+		static struct VariableInfo
+		{
+			string name;
+			size_t line;
+			size_t column;
+			bool isValueType;
+		}
 
-	bool inAsm;
+		void popScope()
+		{
+			foreach (vi; tree[$ - 1])
+			{
+				immutable string errorMessage = "Variable " ~ vi.name
+					~ " is never modified and could have been declared const or immutable.";
+				addErrorMessage(vi.line, vi.column, "dscanner.suspicious.unmodified", errorMessage);
+			}
+			tree = tree[0 .. $ - 1];
+		}
 
-	RedBlackTree!(VariableInfo*, "a.name < b.name")[] tree;
-}
+		void pushScope()
+		{
+			tree ~= new RedBlackTree!(VariableInfo*, "a.name < b.name");
+		}
 
-bool isValueTypeSimple(const Type type) pure nothrow @nogc
-{
-	if (type.type2 is null)
-		return false;
-	return type.type2.builtinType != tok!"" && type.typeSuffixes.length == 0;
+		extern(D) void variableMightBeModified(string name)
+		{
+			size_t index = tree.length - 1;
+			auto vi = VariableInfo(name);
+			
+			while (true)
+			{
+				if (tree[index].removeKey(&vi) != 0 || index == 0)
+					break;
+				index--;
+			}
+		}
+
+		int inAggregate;
+
+		int interest;
+
+		int guaranteeUse;
+
+		int isImmutable;
+
+		bool inAsm;
+
+		RedBlackTree!(VariableInfo*, "a.name < b.name")[] tree;
 }
 
 @system unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarnings;
+	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
 	import std.stdio : stderr;
 	import std.format : format;
 

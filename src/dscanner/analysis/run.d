@@ -473,10 +473,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new CommaExpressionCheck(fileName, moduleScope,
 		analysisConfig.comma_expression_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!UnmodifiedFinder(analysisConfig))
-		checks ~= new UnmodifiedFinder(fileName, moduleScope,
-		analysisConfig.could_be_immutable_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!DuplicateAttributeCheck(analysisConfig))
 		checks ~= new DuplicateAttributeCheck(fileName, moduleScope,
 		analysisConfig.duplicate_attribute == Check.skipTests && !ut);
@@ -553,10 +549,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	if (moduleName.shouldRun!AutoFunctionChecker(analysisConfig))
 		checks ~= new AutoFunctionChecker(fileName,
 		analysisConfig.auto_function_check == Check.skipTests && !ut);
-
-	// if (moduleName.shouldRun!ProperlyDocumentedPublicFunctions(analysisConfig))
-	// 	checks ~= new ProperlyDocumentedPublicFunctions(fileName,
-	// 	analysisConfig.properly_documented_public_functions == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!VcallCtorChecker(analysisConfig))
 		checks ~= new VcallCtorChecker(fileName,
@@ -688,6 +680,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new ProperlyDocumentedPublicFunctions!ASTCodegen(
 			fileName,
 			config.properly_documented_public_functions == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(UnmodifiedFinder!ASTCodegen)(config))
+		visitors ~= new UnmodifiedFinder!ASTCodegen(
+			fileName,
+			config.could_be_immutable_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
