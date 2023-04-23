@@ -262,7 +262,7 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		input ~= '\0';
 
 		auto t = dmd.frontend.parseModule(cast(const(char)[]) fileName, cast(const (char)[]) input);
-		// t.module_.fullSemantic();
+		t.module_.fullSemantic();
 
 		// Skip files that could not be read and continue with the rest
 		if (code.length == 0)
@@ -469,10 +469,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	if (moduleName.shouldRun!IfElseSameCheck(analysisConfig))
 		checks ~= new IfElseSameCheck(fileName, moduleScope,
 		analysisConfig.if_else_same_check == Check.skipTests&& !ut);
-
-	if (moduleName.shouldRun!LabelVarNameCheck(analysisConfig))
-		checks ~= new LabelVarNameCheck(fileName, moduleScope,
-		analysisConfig.label_var_same_name_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!MismatchedArgumentCheck(analysisConfig))
 		checks ~= new MismatchedArgumentCheck(fileName, moduleScope,
@@ -689,6 +685,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new TrustTooMuchCheck!ASTCodegen(
 			fileName,
 			config.trust_too_much == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(LabelVarNameCheck!ASTCodegen)(config))
+		visitors ~= new LabelVarNameCheck!ASTCodegen(
+			fileName,
+			config.label_var_same_name_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
