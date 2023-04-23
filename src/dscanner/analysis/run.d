@@ -517,10 +517,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new UndocumentedDeclarationCheck(fileName, moduleScope,
 		analysisConfig.undocumented_declaration_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!UnusedLabelCheck(analysisConfig))
-		checks ~= new UnusedLabelCheck(fileName, moduleScope,
-		analysisConfig.unused_label_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!UnusedVariableCheck(analysisConfig))
 		checks ~= new UnusedVariableCheck(fileName, moduleScope,
 		analysisConfig.unused_variable_check == Check.skipTests && !ut);
@@ -688,6 +684,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new UselessAssertCheck!ASTCodegen(
 			fileName,
 			config.useless_assert_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(UnusedLabelCheck!ASTCodegen)(config))
+		visitors ~= new UnusedLabelCheck!ASTCodegen(
+			fileName,
+			config.unused_label_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
