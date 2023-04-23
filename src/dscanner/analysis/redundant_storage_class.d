@@ -5,68 +5,106 @@
 
 module dscanner.analysis.redundant_storage_class;
 
-import std.stdio;
-import std.string;
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
-import dsymbol.scope_ : Scope;
+import std.format;
+import std.algorithm.comparison : among;
+import std.algorithm.searching: all;
+import dmd.astenums : STC;
 
 /**
  * Checks for redundant storage classes such immutable and __gshared, static and __gshared
  */
-final class RedundantStorageClassCheck : BaseAnalyzer
+extern(C++) class RedundantStorageClassCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzer.visit;
-	enum string REDUNDANT_VARIABLE_ATTRIBUTES = "Variable declaration for `%s` has redundant attributes (%-(`%s`%|, %)).";
 	mixin AnalyzerInfo!"redundant_storage_classes";
+	alias visit = BaseAnalyzerDmd.visit;
 
-	this(string fileName, bool skipTests = false)
+	extern(D) this(string fileName, bool skipTests = false)
 	{
-		super(fileName, null, skipTests);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const Declaration node)
+	override void visit(AST.VarDeclaration d)
 	{
-		checkAttributes(node);
-		node.accept(this);
-	}
+		const(char[])[] stcAttributes = [];
 
-	void checkAttributes(const Declaration node)
-	{
-		if (node.variableDeclaration !is null && node.attributes !is null)
-			checkVariableDeclaration(node.variableDeclaration, node.attributes);
-	}
+		if (d.storage_class & STC.static_)
+			stcAttributes ~= "static";
 
-	void checkVariableDeclaration(const VariableDeclaration vd, const Attribute[] attributes)
-	{
-		import std.algorithm.comparison : among;
-		import std.algorithm.searching: all;
+		if (d.storage_class & STC.immutable_)
+			stcAttributes ~= "immutable";
 
-		string[] globalAttributes;
-		foreach (attrib; attributes)
+		if (d.storage_class & STC.shared_)
+			stcAttributes ~= "shared";
+
+		if (d.storage_class & STC.gshared)
+			stcAttributes ~= "__ghsared";
+
+		if (stcAttributes.length > 1)
 		{
-			if (attrib.attribute.type.among(tok!"shared", tok!"static", tok!"__gshared", tok!"immutable"))
-				globalAttributes ~= attrib.attribute.type.str;
-		}
-		if (globalAttributes.length > 1)
-		{
-			if (globalAttributes.length == 2 && (
-					globalAttributes.all!(a => a.among("shared", "static")) ||
-					globalAttributes.all!(a => a.among("static", "immutable"))
+			if (stcAttributes.length == 2 && (
+					stcAttributes.all!(a => a.among("shared", "static")) ||
+					stcAttributes.all!(a => a.among("static", "immutable"))
 			))
 				return;
-			auto t = vd.declarators[0].name;
-			string message = REDUNDANT_VARIABLE_ATTRIBUTES.format(t.text, globalAttributes);
-			addErrorMessage(t.line, t.column, "dscanner.unnecessary.duplicate_attribute", message);
+			
+			addErrorMessage(cast(ulong) d.loc.linnum, cast(ulong) d.loc.charnum,
+							KEY, REDUNDANT_VARIABLE_ATTRIBUTES.format(d.ident.toString(), stcAttributes));
 		}
 	}
+
+	override void visit(AST.StorageClassDeclaration scd)
+	{
+		if (!scd.decl)
+			return;
+
+		foreach (member; *scd.decl)
+		{
+			auto vd = member.isVarDeclaration();
+
+			if (!vd)
+				continue;
+
+			const(char[])[] stcAttributes = [];
+
+			if (vd.storage_class & STC.static_ || scd.stc & STC.static_)
+				stcAttributes ~= "static";
+
+			if (vd.storage_class & STC.immutable_ || scd.stc & STC.immutable_)
+				stcAttributes ~= "immutable";
+
+			if (vd.storage_class & STC.shared_ || scd.stc & STC.shared_)
+				stcAttributes ~= "shared";
+
+			if (vd.storage_class & STC.gshared || scd.stc & STC.gshared)
+				stcAttributes ~= "__ghsared";
+
+			if (stcAttributes.length > 1)
+			{
+				if (stcAttributes.length == 2 && (
+						stcAttributes.all!(a => a.among("shared", "static")) ||
+						stcAttributes.all!(a => a.among("static", "immutable"))
+				))
+					return;
+				
+				addErrorMessage(cast(ulong) vd.loc.linnum, cast(ulong) vd.loc.charnum,
+								KEY, REDUNDANT_VARIABLE_ATTRIBUTES.format(vd.ident.toString(), stcAttributes));
+			}
+		}
+	}
+
+	private:
+		enum KEY = "dscanner.unnecessary.duplicate_attribute";
+		const(char[]) REDUNDANT_VARIABLE_ATTRIBUTES = "Variable declaration for `%s` has redundant attributes (%-(`%s`%|, %)).";
 }
 
 unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
+	import std.stdio : stderr;
+
+	alias assertAnalyzerWarnings = assertAnalyzerWarningsDMD; 
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.redundant_storage_classes = Check.enabled;
@@ -75,13 +113,13 @@ unittest
 	assertAnalyzerWarnings(q{
 		immutable int a;
 
-		immutable shared int a; // [warn]: %s
-		shared immutable int a; // [warn]: %s
+		immutable shared int a; // [warn]: Variable declaration for `a` has redundant attributes (`immutable`, `shared`).
+		shared immutable int a; // [warn]: Variable declaration for `a` has redundant attributes (`immutable`, `shared`).
 
-		immutable __gshared int a; // [warn]: %s
-		__gshared immutable int a; // [warn]: %s
+		immutable __gshared int a; // [warn]: Variable declaration for `a` has redundant attributes (`immutable`, `__ghsared`).
+		__gshared immutable int a; // [warn]: Variable declaration for `a` has redundant attributes (`immutable`, `__ghsared`).
 
-		__gshared static int a; // [warn]: %s
+		__gshared static int a; // [warn]: Variable declaration for `a` has redundant attributes (`static`, `__ghsared`).
 
 		shared static int a;
 		static shared int a;
@@ -91,13 +129,7 @@ unittest
 		enum int a;
 		extern(C++) immutable int a;
 		immutable int function(immutable int, shared int) a;
-	}c.format(
-		RedundantStorageClassCheck.REDUNDANT_VARIABLE_ATTRIBUTES.format("a", ["immutable", "shared"]),
-		RedundantStorageClassCheck.REDUNDANT_VARIABLE_ATTRIBUTES.format("a", ["shared", "immutable"]),
-		RedundantStorageClassCheck.REDUNDANT_VARIABLE_ATTRIBUTES.format("a", ["immutable", "__gshared"]),
-		RedundantStorageClassCheck.REDUNDANT_VARIABLE_ATTRIBUTES.format("a", ["__gshared", "immutable"]),
-		RedundantStorageClassCheck.REDUNDANT_VARIABLE_ATTRIBUTES.format("a", ["__gshared", "static"]),
-	), sac);
+	}c, sac);
 
 	stderr.writeln("Unittest for RedundantStorageClassCheck passed.");
 }

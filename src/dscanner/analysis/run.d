@@ -557,10 +557,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new TrustTooMuchCheck(fileName,
 		analysisConfig.trust_too_much == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!RedundantStorageClassCheck(analysisConfig))
-		checks ~= new RedundantStorageClassCheck(fileName,
-		analysisConfig.redundant_storage_classes == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!UnusedResultChecker(analysisConfig))
 		checks ~= new UnusedResultChecker(fileName, moduleScope,
 		analysisConfig.unused_result == Check.skipTests && !ut);
@@ -687,6 +683,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new RedundantParenCheck!ASTCodegen(
 			fileName,
 			config.redundant_parens_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(RedundantStorageClassCheck!ASTCodegen)(config))
+		visitors ~= new RedundantStorageClassCheck!ASTCodegen(
+			fileName,
+			config.redundant_storage_classes == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
