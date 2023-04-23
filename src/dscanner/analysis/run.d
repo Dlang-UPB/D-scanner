@@ -40,7 +40,6 @@ import dscanner.analysis.constructors;
 import dscanner.analysis.unused_variable;
 import dscanner.analysis.unused_label;
 import dscanner.analysis.unused_parameter;
-import dscanner.analysis.duplicate_attribute;
 import dscanner.analysis.opequals_without_tohash;
 import dscanner.analysis.length_subtraction;
 import dscanner.analysis.builtin_property_names;
@@ -466,10 +465,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	if (moduleName.shouldRun!AsmStyleCheck(analysisConfig))
 		checks ~= new AsmStyleCheck(fileName, moduleScope,
 		analysisConfig.asm_style_check == Check.skipTests && !ut);
-
-	if (moduleName.shouldRun!DuplicateAttributeCheck(analysisConfig))
-		checks ~= new DuplicateAttributeCheck(fileName, moduleScope,
-		analysisConfig.duplicate_attribute == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!IfElseSameCheck(analysisConfig))
 		checks ~= new IfElseSameCheck(fileName, moduleScope,
