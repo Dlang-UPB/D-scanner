@@ -500,10 +500,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new NumberStyleCheck(fileName, moduleScope,
 		analysisConfig.number_style_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!RedundantParenCheck(analysisConfig))
-		checks ~= new RedundantParenCheck(fileName, moduleScope,
-		analysisConfig.redundant_parens_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!StyleChecker(analysisConfig))
 		checks ~= new StyleChecker(fileName, moduleScope,
 		analysisConfig.style_check == Check.skipTests && !ut);
@@ -685,6 +681,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new UnusedLabelCheck!ASTCodegen(
 			fileName,
 			config.unused_label_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(RedundantParenCheck!ASTCodegen)(config))
+		visitors ~= new RedundantParenCheck!ASTCodegen(
+			fileName,
+			config.redundant_parens_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
