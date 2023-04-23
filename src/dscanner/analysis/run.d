@@ -529,10 +529,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new LambdaReturnCheck(fileName,
 		analysisConfig.lambda_return_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!AutoFunctionChecker(analysisConfig))
-		checks ~= new AutoFunctionChecker(fileName,
-		analysisConfig.auto_function_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!VcallCtorChecker(analysisConfig))
 		checks ~= new VcallCtorChecker(fileName,
 		analysisConfig.vcall_in_ctor == Check.skipTests && !ut);
@@ -689,6 +685,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new RedundantStorageClassCheck!ASTCodegen(
 			fileName,
 			config.redundant_storage_classes == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(AutoFunctionChecker!ASTCodegen)(config))
+		visitors ~= new AutoFunctionChecker!ASTCodegen(
+			fileName,
+			config.auto_function_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
