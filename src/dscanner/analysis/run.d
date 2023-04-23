@@ -48,7 +48,6 @@ import dscanner.analysis.asm_style;
 import dscanner.analysis.logic_precedence;
 import dscanner.analysis.stats_collector;
 import dscanner.analysis.undocumented;
-import dscanner.analysis.comma_expression;
 import dscanner.analysis.function_attributes;
 import dscanner.analysis.local_imports;
 import dscanner.analysis.unmodified;
@@ -467,10 +466,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	if (moduleName.shouldRun!AsmStyleCheck(analysisConfig))
 		checks ~= new AsmStyleCheck(fileName, moduleScope,
 		analysisConfig.asm_style_check == Check.skipTests && !ut);
-
-	if (moduleName.shouldRun!CommaExpressionCheck(analysisConfig))
-		checks ~= new CommaExpressionCheck(fileName, moduleScope,
-		analysisConfig.comma_expression_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!DuplicateAttributeCheck(analysisConfig))
 		checks ~= new DuplicateAttributeCheck(fileName, moduleScope,
