@@ -521,10 +521,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		analysisConfig.max_line_length,
 		analysisConfig.long_line_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!StaticIfElse(analysisConfig))
-		checks ~= new StaticIfElse(fileName,
-		analysisConfig.static_if_else_check == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!LambdaReturnCheck(analysisConfig))
 		checks ~= new LambdaReturnCheck(fileName,
 		analysisConfig.lambda_return_check == Check.skipTests && !ut);
@@ -691,6 +687,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new AutoFunctionChecker!ASTCodegen(
 			fileName,
 			config.auto_function_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(StaticIfElse!ASTCodegen)(config))
+		visitors ~= new StaticIfElse!ASTCodegen(
+			fileName,
+			config.static_if_else_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
