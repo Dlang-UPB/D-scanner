@@ -503,10 +503,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new LambdaReturnCheck(fileName,
 		analysisConfig.lambda_return_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!VcallCtorChecker(analysisConfig))
-		checks ~= new VcallCtorChecker(fileName,
-		analysisConfig.vcall_in_ctor == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!UselessInitializerChecker(analysisConfig))
 		checks ~= new UselessInitializerChecker(fileName,
 		analysisConfig.useless_initializer == Check.skipTests && !ut);
@@ -691,6 +687,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new LabelVarNameCheck!ASTCodegen(
 			fileName,
 			config.label_var_same_name_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(VcallCtorChecker!ASTCodegen)(config))
+		visitors ~= new VcallCtorChecker!ASTCodegen(
+			fileName,
+			config.vcall_in_ctor == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
