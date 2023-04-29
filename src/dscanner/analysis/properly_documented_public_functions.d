@@ -6,7 +6,6 @@ module dscanner.analysis.properly_documented_public_functions;
 
 import dscanner.analysis.base;
 import std.format : format;
-import std.stdio : writeln;
 import std.range.primitives;
 import std.conv : to;
 import std.algorithm.searching : canFind, any, find;
@@ -54,9 +53,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 	{
 		import std.algorithm.iteration : filter;
 		import std.array : array;
-
-		// writeln(thrown);
-		// writeln(to!string(c.type.toChars()));
 
 		thrown = thrown.filter!(a => a != to!string(c.type.toChars())).array;
 		super.visit(c);
@@ -130,7 +126,8 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 		if (d.comment is null)
 			return;
 
-		// Undefined means we can have a `template` inside another public `template`
+		// A `template` inside another public `template` declaration will have visibility undefined
+		// Check that as well as it's part of the public template
 		if ((d.visibility.kind != Visibility.Kind.public_)
 			&& !(d.visibility.kind == Visibility.Kind.undefined && withinTemplate))
 				return;
@@ -140,29 +137,26 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 			setLastDdocParams(d.loc.linnum, d.loc.charnum, to!string(d.comment));
 			withinTemplate = true;
 			funcParams.length = 0;
-			tlParams.length = 0;
-			tlList.length = 0;
+			templateParams.length = 0;
 		}
 
 		foreach (p; *d.origParameters)
-			if (!canFind(tlList, to!string(p.ident.toString())))
-			{
-				tlList ~= to!string(p.ident.toString());
-				tlParams ~= to!string(p.ident.toString());
-			}
-
-
+			if (!canFind(templateParams, to!string(p.ident.toString())))
+				templateParams ~= to!string(p.ident.toString());
 
 		super.visit(d);
 
 		if (d.visibility.kind == Visibility.Kind.public_)
 		{
 			withinTemplate = false;
-			
-			checkDdocParams(d.loc.linnum, d.loc.charnum, funcParams, tlParams);
+			checkDdocParams(d.loc.linnum, d.loc.charnum, funcParams, templateParams);
 		}
 	}
 
+	/** 
+	 * Look for: foo(T)(T x)
+	 * In that case, T does not have to be documented, because x must be.
+	 */
 	override bool visitEponymousMember(AST.TemplateDeclaration d)
     {
 		import ddoc.comments : parseComment;
@@ -170,8 +164,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 		import std.algorithm.iteration : map, filter;
 		import std.array : array;
 
-		// writeln("IN MY VISIT EPONYMOUS MEMBER");
-        //printf("Visiting EponymousMember\n");
         if (!d.members || d.members.length != 1)
             return false;
         AST.Dsymbol onemember = (*d.members)[0];
@@ -199,63 +191,22 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 					if (ti is null)
 						continue;
 
-					tlParams = tlParams.filter!(a => a != to!string(ti.ident.toString())).array;
+					templateParams = templateParams.filter!(a => a != to!string(ti.ident.toString())).array;
 					lastSeenFun.params[to!string(ti.ident.toString())] = true;
-
-					// if (!canFind(tlParams, to!string(ti.ident.toString())))
-					// 	tlParams ~= to!string(ti.ident.toString());
 				}
-
-            //printf("IN EPONYMOUS MEMBER FUNC DECL\n");
-            assert(fd.type);
-            visitFunctionType(fd.type.isTypeFunction(), d);
-            if (d.constraint)
-                d.constraint.accept(this);
-            visitFuncBody(fd);
-
             return true;
         }
 
         if (AST.AggregateDeclaration ad = onemember.isAggregateDeclaration())
-        {
-            //printf("IN EPONYMOUS MEMBER AGGREGATE DECL\n");
-            visitTemplateParameters(d.parameters);
-            if (d.constraint)
-                d.constraint.accept(this);
-            visitBaseClasses(ad.isClassDeclaration());
-
-            if (ad.members)
-                foreach (s; *ad.members)
-                    s.accept(this);
-
             return true;
-        }
 
         if (AST.VarDeclaration vd = onemember.isVarDeclaration())
         {
-            //printf("IN EPONYMOUS MEMBER VAR DECL\n");
             if (d.constraint)
                 return false;
-            if (vd.type)
-                visitType(vd.type);
-            visitTemplateParameters(d.parameters);
-            if (vd._init)
-            {
-                // note similarity of this code with visitVarDecl()
-                if (auto ie = vd._init.isExpInitializer())
-                {
-                    if (auto ce = ie.exp.isConstructExp())
-                        ce.e2.accept(this);
-                    else if (auto be = ie.exp.isBlitExp())
-                        be.e2.accept(this);
-                    else
-                        vd._init.accept(this);
-                }
-                else
-                    vd._init.accept(this);
-
+            
+			if (vd._init)
                 return true;
-            }
         }
 
         return false;
@@ -296,9 +247,16 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 		return comment;
 	}
 
-	// tl params denumiri template care vin de la argumente, tl list toate template urile
-	extern(D) void checkDdocParams(size_t line, size_t column, string[] params,
-						string[] tlParams)
+	/** 
+	 * 
+	 * Params:
+	 *   line = Line of the public declaration verified
+	 *   column = Column of the public declaration verified
+	 *   params = Funcion parameters that must be documented
+	 *   templateParams = Template parameters that must be documented.
+	 *			Can be null if we are looking at a regular FuncDeclaration
+	 */
+	extern(D) void checkDdocParams(size_t line, size_t column, string[] params, string[] templateParams)
 	{
 		import std.array : array;
 		import std.algorithm.searching : canFind, countUntil;
@@ -317,7 +275,7 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 					lastSeenFun.params[p] = true;
 			}
 
-		checkDdocParams(line, column, tlParams);
+		checkDdocParams(line, column, templateParams);
 	}
 
 	extern(D) void checkDdocParams(size_t line, size_t column, string[] templateParams)
@@ -341,7 +299,6 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 		const comment = parseComment(commentText, null);
 		return comment.isDitto || comment.sections.canFind!(s => s.name == "Throws");
 	}
-
 	
 	void postCheckSeenDdocParams()
 	{
@@ -361,15 +318,16 @@ extern(C++) class ProperlyDocumentedPublicFunctions(AST) : BaseAnalyzerDmd
 	int withinTemplate;
 
 	extern(D) string[] funcParams;
-	extern(D) string[] tlParams;
-	extern(D) string[] tlList;
+	extern(D) string[] templateParams;
 	extern(D) string[] thrown;
 
 	static struct Function
 	{
 		bool active;
 		size_t line, column;
+		// All params documented
 		const(string)[] ddocParams;
+		// Stores actual function params that are also documented
 		bool[string] params;
 	}
 	Function lastSeenFun;

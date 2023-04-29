@@ -145,12 +145,7 @@ void assertAnalyzerWarnings(string code, const StaticAnalysisConfig config,
 void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config, bool semantic = false,
 		string file = __FILE__, size_t line = __LINE__)
 {
-	// import dmd.parse : Parser;
-	// import dmd.astbase : ASTBase;
-	// import dmd.id : Id;
 	import dmd.globals : global;
-	// import dmd.identifier : Identifier;
-	// import std.string : toStringz;
 	import dscanner.utils : getModuleName;
 	import std.file : remove, exists;
 	import std.stdio : File;

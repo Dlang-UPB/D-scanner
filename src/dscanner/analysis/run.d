@@ -554,10 +554,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new AutoFunctionChecker(fileName,
 		analysisConfig.auto_function_check == Check.skipTests && !ut);
 
-	// if (moduleName.shouldRun!ProperlyDocumentedPublicFunctions(analysisConfig))
-	// 	checks ~= new ProperlyDocumentedPublicFunctions(fileName,
-	// 	analysisConfig.properly_documented_public_functions == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!VcallCtorChecker(analysisConfig))
 		checks ~= new VcallCtorChecker(fileName,
 		analysisConfig.vcall_in_ctor == Check.skipTests && !ut);

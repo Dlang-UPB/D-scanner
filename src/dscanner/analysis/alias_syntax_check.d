@@ -16,7 +16,6 @@ import dmd.location : Loc;
 extern(C++) class AliasSyntaxCheck(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"alias_syntax_check";
-	// alias visit = BaseAnalyzerDmd!AST.visit;
 	alias visit = BaseAnalyzerDmd.visit;
 
 	extern(D) this(string fileName)

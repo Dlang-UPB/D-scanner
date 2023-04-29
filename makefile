@@ -131,7 +131,7 @@ FIRST_RUN_FLAG := $(OBJ_DIR)/$(DC)/first_run.flag
 
 $(OBJ_DIR)/$(DC)/%.o: %.d
 	if [ ! -f $(FIRST_RUN_FLAG) ]; then \
-		${DC} dmd/config.d && ./config bin VERSION /etc; \
+		${DC} -run dmd/config.d bin VERSION /etc; \
 		touch $(FIRST_RUN_FLAG); \
 	fi
 	${DC} ${DC_FLAGS} ${VERSIONS} ${INCLUDE_PATHS} -c $< ${WRITE_TO_TARGET_NAME}
