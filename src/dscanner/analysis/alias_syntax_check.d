@@ -8,7 +8,8 @@ module dscanner.analysis.alias_syntax_check;
 import dscanner.analysis.base;
 import dmd.tokens;
 import dmd.lexer : Lexer;
-import dmd.globals : Loc;
+import dmd.location;
+import dmd.globals;
 
 /**
  * Checks for uses of the old alias syntax.
@@ -34,7 +35,7 @@ extern(C++) class AliasSyntaxCheck(AST) : BaseAnalyzerDmd!AST
 		bytes ~= "\0";
 		bytes = bytes[ad.loc.fileOffset .. $];
 
-		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0);
+		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0, global.errorSink, &global.compileEnv);
 		TOK nextTok;
 		lexer.nextToken();
 

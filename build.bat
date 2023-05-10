@@ -52,7 +52,9 @@ set DMD_PARSER_SRC=^
 	dmd\compiler\src\dmd\transitivevisitor.d ^
 	dmd\compiler\src\dmd\permissivevisitor.d ^
 	dmd\compiler\src\dmd\strictvisitor.d ^
-	dmd\compiler\src\dmd\astenums.d
+	dmd\compiler\src\dmd\astenums.d ^
+	dmd\compiler\src\dmd\errorsink.d ^
+	dmd\compiler\src\dmd\location.d
 
 for %%x in (src\dscanner\*.d) do set CORE=!CORE! %%x
 for %%x in (src\dscanner\analysis\*.d) do set ANALYSIS=!ANALYSIS! %%x
@@ -88,11 +90,7 @@ if "%1" == "test" goto test_cmd
 	-I"containers\src"^
 	-I"libddoc\src"^
 	-I"libddoc\common\source"^
-<<<<<<< HEAD
 	-I"dmd\compiler\src"^
-=======
-	-I"dmd\src"^
->>>>>>> Add dmd dependencies to build.bat
 	-ofbin\dscanner.exe
 goto eof
 
@@ -113,11 +111,7 @@ set TESTNAME="bin\dscanner-unittest"
 	-I"DCD\dsymbol\src"^
 	-I"containers\src"^
 	-I"libddoc\src"^
-<<<<<<< HEAD
 	-I"dmd\compiler\src"^
-=======
-	-I"dmd\src"^
->>>>>>> Add dmd dependencies to build.bat
 	-lib %TESTFLAGS%^
 	-of%TESTNAME%.lib
 if exist %TESTNAME%.lib %DC% %MFLAGS%^
@@ -131,11 +125,7 @@ if exist %TESTNAME%.lib %DC% %MFLAGS%^
 	-I"containers\src"^
 	-I"libddoc\src"^
 	-I"libddoc\common\source"^
-<<<<<<< HEAD
 	-I"dmd\compiler\src"^
-=======
-	-I"dmd\src"^
->>>>>>> Add dmd dependencies to build.bat
 	-unittest^
 	%TESTFLAGS%^
 	-of%TESTNAME%.exe

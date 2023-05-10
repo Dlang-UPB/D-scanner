@@ -38,7 +38,7 @@ extern(C++) class AssertWithoutMessageCheck(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.StaticAssert ae)
 	{
-		if (!ae.msg)
+		if (!ae.msgs)
 			addErrorMessage(ae.loc.linnum, ae.loc.charnum, KEY, MESSAGE);
 	}
 

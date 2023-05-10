@@ -90,13 +90,6 @@ final class ProperlyDocumentedPublicFunctions : BaseAnalyzer
 			{
 				thrown ~= newNamedType(tsa.token);
 			}
-			// enforce!(Type)(condition);
-			else if (const TemplateArgumentList tal = safeAccess(iot.templateInstance)
-				.templateArguments.templateArgumentList)
-			{
-				if (tal.items.length && tal.items[0].type)
-					thrown ~= tal.items[0].type;
-			}
 		}
 		decl.accept(this);
 	}
@@ -1157,24 +1150,6 @@ enforce
 void bar() // [warn]: %s
 {
     enforce!AssertError(condition);
-}
-    }c.format(
-        ProperlyDocumentedPublicFunctions.MISSING_THROW_MESSAGE.format("AssertError")
-    ), sac);
-}
-
-unittest
-{
-    StaticAnalysisConfig sac = disabledConfig;
-    sac.properly_documented_public_functions = Check.enabled;
-
-    assertAnalyzerWarnings(q{
-/++
-enforce
-+/
-void bar() // [warn]: %s
-{
-    enforce!(AssertError)(condition);
 }
     }c.format(
         ProperlyDocumentedPublicFunctions.MISSING_THROW_MESSAGE.format("AssertError")

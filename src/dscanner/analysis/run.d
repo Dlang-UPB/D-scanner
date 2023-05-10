@@ -259,7 +259,7 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		auto ast_m = new ASTBase.Module(fileName.toStringz, id, false, false);
 		auto input = cast(char[]) code;
 		input ~= '\0';
-		scope astbaseParser = new Parser!ASTBase(ast_m, input, false);
+		scope astbaseParser = new Parser!ASTBase(ast_m, input, false, global.errorSink, &global.compileEnv, true);
 		astbaseParser.nextToken();
 		ast_m.members = astbaseParser.parseModule();
 
@@ -683,28 +683,6 @@ MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName
 			fileName,
 			config.backwards_range_check == Check.skipTests && !ut
 		);
-
-	foreach (visitor; visitors)
-	{
-		m.accept(visitor);
-		
-		foreach (message; visitor.messages)
-			set.insert(message);
-	}
-
-	return set;
-}
-
-MessageSet analyzeDmd(string fileName, ASTBase.Module m, const char[] moduleName, const StaticAnalysisConfig config)
-{
-	MessageSet set = new MessageSet;
-	BaseAnalyzerDmd!ASTBase[] visitors;
-
-	if (moduleName.shouldRunDmd!(ObjectConstCheck!ASTBase)(config))
-		visitors ~= new ObjectConstCheck!ASTBase(fileName);
-
-	if (moduleName.shouldRunDmd!(EnumArrayVisitor!ASTBase)(config))
-		visitors ~= new EnumArrayVisitor!ASTBase(fileName);
 
 	foreach (visitor; visitors)
 	{

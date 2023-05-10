@@ -173,7 +173,7 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 	auto ast_m = new ASTBase.Module(file.toStringz, id, false, false);
 	char[] input = code.dup;
 	input ~= '\0';
-	scope astbaseParser = new Parser!ASTBase(ast_m, input, false);
+	scope astbaseParser = new Parser!ASTBase(ast_m, input, false, global.errorSink, &global.compileEnv, true);
 	astbaseParser.nextToken();
 	ast_m.members = astbaseParser.parseModule();
 	MessageSet rawWarnings = analyzeDmd("test.txt", ast_m, getModuleName(astbaseParser.md), config);
@@ -253,8 +253,4 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config,
 		immutable string message = "Unexpected warnings:\n" ~ unexpectedWarnings.join("\n");
 		throw new AssertError(message, file, line);
 	}
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> replace libdparse in objectconst functionality + unittests integration with dmd (#17)

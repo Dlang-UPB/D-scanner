@@ -6,7 +6,6 @@ DMD := $(DC)
 GDC := gdc
 LDC := ldc2
 DMD_ROOT_SRC := \
-<<<<<<< HEAD
 	$(shell find dmd/compiler/src/dmd/common -name "*.d")\
 	$(shell find dmd/compiler/src/dmd/root -name "*.d")
 DMD_LEXER_SRC := \
@@ -30,31 +29,8 @@ DMD_PARSER_SRC := \
 	dmd/compiler/src/dmd/permissivevisitor.d \
 	dmd/compiler/src/dmd/strictvisitor.d \
 	dmd/compiler/src/dmd/astenums.d \
-=======
-	$(shell find dmd/src/dmd/common -name "*.d")\
-	$(shell find dmd/src/dmd/root -name "*.d")
-DMD_LEXER_SRC := \
-	dmd/src/dmd/console.d \
-	dmd/src/dmd/entity.d \
-	dmd/src/dmd/errors.d \
-	dmd/src/dmd/file_manager.d \
-	dmd/src/dmd/globals.d \
-	dmd/src/dmd/id.d \
-	dmd/src/dmd/identifier.d \
-	dmd/src/dmd/lexer.d \
-	dmd/src/dmd/tokens.d \
-	dmd/src/dmd/utils.d \
-	$(DMD_ROOT_SRC)
-
-DMD_PARSER_SRC := \
-	dmd/src/dmd/astbase.d \
-	dmd/src/dmd/parse.d \
-	dmd/src/dmd/parsetimevisitor.d \
-	dmd/src/dmd/transitivevisitor.d \
-	dmd/src/dmd/permissivevisitor.d \
-	dmd/src/dmd/strictvisitor.d \
-	dmd/src/dmd/astenums.d \
->>>>>>> Add dmd-as-a-library submodule (#2)
+	dmd/compiler/src/dmd/location.d \
+	dmd/compiler/src/dmd/errorsink.d \
 	$(DMD_LEXER_SRC)
 
 LIB_SRC := \

@@ -60,7 +60,7 @@ private void visitFile(bool usingStdin, string fileName, RedBlackTree!string imp
 	ubyte[] bytes = usingStdin ? readStdin() : readFile(fileName);
 	auto input = cast(char[]) bytes;
 
-	scope p = new Parser!ASTBase(m, input, false);
+	scope p = new Parser!ASTBase(m, input, false, global.errorSink, &global.compileEnv, true);
 	p.nextToken();
 	m.members = p.parseModule();
 
