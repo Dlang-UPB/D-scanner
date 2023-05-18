@@ -10,14 +10,12 @@ LDC := ldc2
 DMD_ROOT_SRC := \
 	$(shell find dmd/compiler/src/dmd/common -name "*.d")\
 	$(shell find dmd/compiler/src/dmd/root -name "*.d")\
-	# $(shell find dmd/compiler/src/dmd -name "*.d")
 
 DMD_FRONTEND_SRC := \
 	$(shell find dmd/compiler/src/dmd/common -name "*.d")\
 	$(shell find dmd/compiler/src/dmd/root -name "*.d")\
 	$(shell find dmd/compiler/src/dmd/backend -name "*.d")\
 	$(shell find dmd/compiler/src/dmd -maxdepth 1 -name "*.d" ! -name "mars.d" )
-	# $(shell find dmd/compiler/src/dmd -maxdepth 1 -name "*.d")
 
 DMD_LEXER_SRC := \
 	dmd/compiler/src/dmd/console.d \
@@ -92,7 +90,7 @@ LDC_DEBUG_VERSIONS = -d-version=dparse_verbose
 GDC_VERSIONS = -fversion=StdLoggerDisableWarning -fversion=CallbackAPI -fversion=DMDLIB -fversion=MARS
 GDC_DEBUG_VERSIONS = -fversion=dparse_verbose
 
-DC_FLAGS += -Jbin -Jdmd -g -Jdmd/compiler/src/dmd/res
+DC_FLAGS += -Jbin -Jdmd -Jdmd/compiler/src/dmd/res
 override DMD_FLAGS += $(DFLAGS) -w -release -O -od${OBJ_DIR}
 override LDC_FLAGS += $(DFLAGS) -O5 -release -oq
 override GDC_FLAGS += $(DFLAGS) -O3 -frelease -fall-instantiations

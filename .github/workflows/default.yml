@@ -109,7 +109,6 @@ jobs:
             ./build.bat test
           else
             NUM_PROC=$(nproc || getconf _NPROCESSORS_ONLN || 1)
-            echo "NUM_PROC=$NUM_PROC"
             make "-j$((NUM_PROC / 2))" all test
           fi
 
