@@ -9,18 +9,20 @@ import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 import std.string : format;
 import std.stdio;
-import dmd.astbase;
+import dmd.dsymbol;
+import dmd.astcodegen;
 
 /**
  * Checks for useless usage of the final attribute.
  *
  * There are several cases where the compiler allows them even if it's a noop.
  */
-extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
+extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd
 {
 
 	mixin AnalyzerInfo!"final_attribute_check";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	// alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	enum Parent
 	{
@@ -201,7 +203,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 
 	override void visit(AST.VisibilityDeclaration vd)
 	{
-		if (vd.visibility.kind == ASTBase.Visibility.Kind.private_)
+		if (vd.visibility.kind == Visibility.Kind.private_)
 			_private = true;
 		else
 			_private = false;
@@ -294,13 +296,13 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 	assertAnalyzerWarningsDMD(q{
 		final void foo(){} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.func_g)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.func_g)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		void foo(){final void foo(){}} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.func_n)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.func_n)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
@@ -310,55 +312,55 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 			final class A{ private: final protected void foo(){}} // [warn]: %s
 		}
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.class_f)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.class_f)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		final struct Foo{} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.struct_i)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.struct_i)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		final union Foo{} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.union_i)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.union_i)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		class Foo{private final void foo(){}} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.class_p)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.class_p)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		class Foo{private: final void foo(){}} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.class_p)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.class_p)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		interface Foo{final void foo(T)(){}} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.interface_t)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.interface_t)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		final class Foo{final void foo(){}} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.class_f)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.class_f)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		private: final class Foo {public: private final void foo(){}} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.class_p)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.class_p)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
 		class Foo {final static void foo(){}} // [warn]: %s
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.class_s)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.class_s)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
@@ -368,7 +370,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 			static: final void foo(){} // [warn]: %s
 		}
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.class_s)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.class_s)
 	), sac);
 
 	assertAnalyzerWarningsDMD(q{
@@ -379,7 +381,7 @@ extern(C++) class FinalAttributeChecker(AST) : BaseAnalyzerDmd!AST
 			void foo(){}
 		}
 	}c.format(
-		(FinalAttributeChecker!ASTBase).MSGB.format((FinalAttributeChecker!ASTBase).MESSAGE.class_s)
+		(FinalAttributeChecker!ASTCodegen).MSGB.format((FinalAttributeChecker!ASTCodegen).MESSAGE.class_s)
 	), sac);
 
 

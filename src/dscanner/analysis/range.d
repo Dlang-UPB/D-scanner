@@ -14,9 +14,9 @@ import std.string : format;
  * Checks for .. expressions where the left side is larger than the right. This
  * is almost always a mistake.
  */
-extern(C++) class BackwardsRangeCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class BackwardsRangeCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"backwards_range_check";
 
 	/// Key for this check in the report output
@@ -36,10 +36,10 @@ extern(C++) class BackwardsRangeCheck(AST) : BaseAnalyzerDmd!AST
 		auto lwr = ie.lwr.isIntegerExp();
 		auto upr = ie.upr.isIntegerExp();
 
-		if (lwr && upr && lwr.value > upr.value)
+		if (lwr && upr && lwr.getInteger() > upr.getInteger())
 		{
 			string message = format("%d is larger than %d. This slice is likely incorrect.",
-						lwr.value, upr.value);
+						lwr.getInteger(), upr.getInteger());
 			addErrorMessage(cast(ulong) ie.loc.linnum, cast(ulong) ie.loc.charnum, KEY, message);
 		}
 			
@@ -50,11 +50,11 @@ extern(C++) class BackwardsRangeCheck(AST) : BaseAnalyzerDmd!AST
 		auto lwr = s.lwr.isIntegerExp();
 		auto upr = s.upr.isIntegerExp();
 
-		if (lwr && upr && lwr.value > upr.value)
+		if (lwr && upr && lwr.getInteger() > upr.getInteger())
 		{
 			string message = format(
 						"%d is larger than %d. Did you mean to use 'foreach_reverse( ... ; %d .. %d)'?",
-						lwr.value, upr.value, upr.value, lwr.value);
+						lwr.getInteger(), upr.getInteger(), upr.getInteger(), lwr.getInteger());
 			addErrorMessage(cast(ulong) s.loc.linnum, cast(ulong) s.loc.charnum, KEY, message);
 		}
 	}

@@ -4,9 +4,9 @@ import std.stdio;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 
-extern(C++) class ConstructorCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class ConstructorCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"constructor_check";
 
 	extern(D) this(string fileName)

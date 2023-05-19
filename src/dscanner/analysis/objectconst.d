@@ -9,10 +9,10 @@ import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 import std.stdio;
 
-extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"object_const_check";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	extern(D) this(string fileName)
 	{
@@ -104,6 +104,8 @@ extern(C++) class ObjectConstCheck(AST) : BaseAnalyzerDmd!AST
 	}
 
 	private enum KEY = "dscanner.suspicious.object_const";
+	
+	AST.AggregateDeclaration deleteme;
 }
 
 unittest

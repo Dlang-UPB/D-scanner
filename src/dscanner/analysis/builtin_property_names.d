@@ -21,9 +21,9 @@ import dscanner.analysis.base;
  * ---
  */
 
-extern(C++) class BuiltinPropertyNameCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class BuiltinPropertyNameCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"builtin_property_names_check";
 
 	extern(D) this(string fileName)

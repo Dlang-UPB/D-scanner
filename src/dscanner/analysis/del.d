@@ -13,10 +13,10 @@ import dsymbol.scope_;
 /**
  * Checks for use of the deprecated 'delete' keyword
  */
-extern(C++) class DeleteCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class DeleteCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzerDmd!AST.visit;
-
+	// alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"delete_check";
 
 	extern(D) this(string fileName)

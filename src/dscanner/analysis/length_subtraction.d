@@ -14,9 +14,10 @@ import dsymbol.scope_;
 /**
  * Checks for subtraction from a .length property. This is usually a bug.
  */
-extern(C++) class LengthSubtractionCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class LengthSubtractionCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	// alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	mixin AnalyzerInfo!"length_subtraction_check";
 

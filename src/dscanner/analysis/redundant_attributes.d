@@ -7,18 +7,18 @@ module dscanner.analysis.redundant_attributes;
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
 
-import dmd.astbase;
+import dmd.dsymbol;
 import std.string : format;
 
 /**
  * Checks for redundant attributes. At the moment only visibility attributes.
  */
-extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"redundant_attributes_check";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 	
-	ASTBase.Visibility.Kind currVisibility;
+	Visibility.Kind currVisibility;
 	uint currLine;
 
 	extern(D) this(string fileName)
@@ -30,8 +30,8 @@ extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
 	{
 		override void visit(NodeType n)
 		{
-			ASTBase.Visibility.Kind prevVisibility = currVisibility;
-			currVisibility = ASTBase.Visibility.Kind.undefined;
+			Visibility.Kind prevVisibility = currVisibility;
+			currVisibility = Visibility.Kind.undefined;
 			super.visit(n);
 			currVisibility = prevVisibility;
 		}
@@ -51,7 +51,7 @@ extern(C++) class RedundantAttributesCheck(AST) : BaseAnalyzerDmd!AST
 		if (currVisibility == vd.visibility.kind)
 		addErrorMessage(cast(ulong) vd.loc.linnum, cast(ulong) vd.loc.charnum, KEY,
 			"Same visibility attribute used as defined on line %u.".format(currLine));
-		ASTBase.Visibility.Kind prevVisibility = currVisibility;
+		Visibility.Kind prevVisibility = currVisibility;
 		uint prevLine = currLine;
 		currVisibility = vd.visibility.kind;
 		currLine = vd.loc.linnum;

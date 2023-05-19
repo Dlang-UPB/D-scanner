@@ -8,15 +8,15 @@ module dscanner.analysis.alias_syntax_check;
 import dscanner.analysis.base;
 import dmd.tokens;
 import dmd.lexer : Lexer;
-import dmd.globals : Loc;
+import dmd.location : Loc;
 
 /**
  * Checks for uses of the old alias syntax.
  */
-extern(C++) class AliasSyntaxCheck(AST) : BaseAnalyzerDmd!AST
+extern(C++) class AliasSyntaxCheck(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"alias_syntax_check";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	extern(D) this(string fileName)
 	{
@@ -26,15 +26,21 @@ extern(C++) class AliasSyntaxCheck(AST) : BaseAnalyzerDmd!AST
 	override void visit(AST.AliasDeclaration ad)
 	{
 		import dscanner.utils: readFile;
+		import dmd.errorsink : ErrorSinkNull;
+		import dmd.globals : global;
+
+		__gshared ErrorSinkNull errorSinkNull;
+		if (!errorSinkNull)
+			errorSinkNull = new ErrorSinkNull;
 
 		auto bytes = readFile(fileName);
 		bool foundEq = false;
 		Loc idLoc;
 
-		bytes ~= "\0";
+		bytes ~= '\0';
 		bytes = bytes[ad.loc.fileOffset .. $];
 
-		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0);
+		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0, errorSinkNull, &global.compileEnv);
 		TOK nextTok;
 		lexer.nextToken();
 

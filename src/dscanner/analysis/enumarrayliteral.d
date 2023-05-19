@@ -7,10 +7,10 @@ module dscanner.analysis.enumarrayliteral;
 
 import dscanner.analysis.base;
 
-extern(C++) class EnumArrayVisitor(AST) : BaseAnalyzerDmd!AST
+extern(C++) class EnumArrayVisitor(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"enum_array_literal_check";
-	alias visit = BaseAnalyzerDmd!AST.visit;
+	alias visit = BaseAnalyzerDmd.visit;
 
 	extern(D) this(string fileName)
 	{
