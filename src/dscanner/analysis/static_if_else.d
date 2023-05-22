@@ -5,10 +5,8 @@
 
 module dscanner.analysis.static_if_else;
 
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
-import dscanner.utils : safeAccess;
+import std.stdio;
 
 /**
  * Checks for potentially mistaken static if / else if.
@@ -22,43 +20,49 @@ import dscanner.utils : safeAccess;
  * 
  * However, it's more likely that this is a mistake.
  */
-final class StaticIfElse : BaseAnalyzer
+extern(C++) class StaticIfElse(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzer.visit;
-
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"static_if_else_check";
 
-	this(string fileName, bool skipTests = false)
+	extern(D) this(string fileName, bool skipTests = false)
 	{
-		super(fileName, null, skipTests);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const ConditionalStatement cc)
+	override void visit(AST.ConditionalStatement s)
 	{
-		cc.accept(this);
-		if (cc.falseStatement is null)
+		import dmd.astenums : STMT;
+
+		if (!s.condition.isStaticIfCondition())
 		{
+			super.visit(s);
 			return;
 		}
-		const(IfStatement) ifStmt = getIfStatement(cc);
-		if (!ifStmt)
+
+		s.condition.accept(this);
+
+		if (s.ifbody)
+            s.ifbody.accept(this);
+        
+		if (s.elsebody)
 		{
-			return;
+			if (s.elsebody.stmt == STMT.If)
+				addErrorMessage(cast(ulong) s.elsebody.loc.linnum, cast(ulong) s.elsebody.loc.charnum,
+					KEY, MESSAGE);
+		
+			s.elsebody.accept(this);
 		}
-		addErrorMessage(ifStmt.line, ifStmt.column, KEY, "Mismatched static if. Use 'else static if' here.");
 	}
 
-	const(IfStatement) getIfStatement(const ConditionalStatement cc)
-	{
-		return safeAccess(cc).falseStatement.statement.statementNoCaseNoDefault.ifStatement;
-	}
-
+private:
 	enum KEY = "dscanner.suspicious.static_if_else";
+	enum MESSAGE = "Mismatched static if. Use 'else static if' here.";
 }
 
 unittest
 {
-	import dscanner.analysis.helpers : assertAnalyzerWarnings;
+	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 	import std.stdio : stderr;
 
