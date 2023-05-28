@@ -554,10 +554,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new IfConstraintsIndentCheck(fileName, tokens,
 		analysisConfig.if_constraints_indent == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!TrustTooMuchCheck(analysisConfig))
-		checks ~= new TrustTooMuchCheck(fileName,
-		analysisConfig.trust_too_much == Check.skipTests && !ut);
-
 	if (moduleName.shouldRun!RedundantStorageClassCheck(analysisConfig))
 		checks ~= new RedundantStorageClassCheck(fileName,
 		analysisConfig.redundant_storage_classes == Check.skipTests && !ut);
@@ -640,6 +636,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new OpEqualsWithoutToHashCheck!ASTCodegen(
 			fileName,
 			config.opequals_tohash_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(TrustTooMuchCheck!ASTCodegen)(config))
+		visitors ~= new TrustTooMuchCheck!ASTCodegen(
+			fileName,
+			config.trust_too_much == Check.skipTests && !ut
 		);
 		
 	if (moduleName.shouldRunDmd!(AutoRefAssignmentCheck!ASTCodegen)(config))
