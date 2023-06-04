@@ -5,12 +5,7 @@
 
 module dscanner.analysis.ifelsesame;
 
-import std.stdio;
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
-import dscanner.analysis.helpers;
-import dsymbol.scope_ : Scope;
 
 /**
  * Checks for duplicated code in conditional and logical expressions.
@@ -20,65 +15,57 @@ import dsymbol.scope_ : Scope;
  * $(LI == expressions where the left and right are the same)
  * )
  */
-final class IfElseSameCheck : BaseAnalyzer
+extern(C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzer.visit;
-
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"if_else_same_check";
 
-	this(string fileName, const(Scope)* sc, bool skipTests = false)
+	extern(D) this(string fileName, bool skipTests = false)
 	{
-		super(fileName, sc, skipTests);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const IfStatement ifStatement)
+	override void visit(AST.IfStatement s)
 	{
-		if (ifStatement.thenStatement && (ifStatement.thenStatement == ifStatement.elseStatement))
-			addErrorMessage(ifStatement.line, ifStatement.column,
-					"dscanner.bugs.if_else_same", "'Else' branch is identical to 'Then' branch.");
-		ifStatement.accept(this);
+		import std.conv : to;
+
+		if (s.elsebody && to!string(s.ifbody.toChars()) == to!string(s.elsebody.toChars()))
+			addErrorMessage(cast(ulong) s.loc.linnum, cast(ulong) s.loc.charnum,
+							IF_KEY, IF_MESSAGE);
+	
+		super.visit(s);
 	}
 
-	override void visit(const AssignExpression assignExpression)
+	override void visit(AST.LogicalExp e)
 	{
-		auto e = cast(const AssignExpression) assignExpression.expression;
-		if (e !is null && assignExpression.operator == tok!"="
-				&& e.ternaryExpression == assignExpression.ternaryExpression)
-		{
-			addErrorMessage(assignExpression.line, assignExpression.column, "dscanner.bugs.self_assignment",
-					"Left side of assignment operatior is identical to the right side.");
-		}
-		assignExpression.accept(this);
+		import dmd.tokens : EXP;
+		import std.conv : to;
+		import std.string : format;
+		import std.stdio : writeln;
+
+		if (to!string(e.e1.toChars()) == to!string(e.e2.toChars()))
+			addErrorMessage(cast(ulong) e.loc.linnum, cast(ulong) e.loc.charnum,
+							LOGICAL_EXP_KEY, LOGICAL_EXP_MESSAGE.format(e.op == EXP.orOr ? "or" : "and"));
+
+		super.visit(e);
 	}
 
-	override void visit(const AndAndExpression andAndExpression)
-	{
-		if (andAndExpression.left !is null && andAndExpression.right !is null
-				&& andAndExpression.left == andAndExpression.right)
-		{
-			addErrorMessage(andAndExpression.line, andAndExpression.column,
-					"dscanner.bugs.logic_operator_operands",
-					"Left side of logical and is identical to right side.");
-		}
-		andAndExpression.accept(this);
-	}
+	private:
+		enum IF_KEY = "dscanner.bugs.if_else_same";
+		enum IF_MESSAGE = "'Else' branch is identical to 'Then' branch.";
+		
+		enum LOGICAL_EXP_MESSAGE = "MUIEEEELeft side of logical %s is identical to right side.";
+		enum LOGICAL_EXP_KEY = "dscanner.bugs.logic_operator_operands";
 
-	override void visit(const OrOrExpression orOrExpression)
-	{
-		if (orOrExpression.left !is null && orOrExpression.right !is null
-				&& orOrExpression.left == orOrExpression.right)
-		{
-			addErrorMessage(orOrExpression.line, orOrExpression.column,
-					"dscanner.bugs.logic_operator_operands",
-					"Left side of logical or is identical to right side.");
-		}
-		orOrExpression.accept(this);
-	}
+		enum ASSIGN_MESSAGE = "Left side of assignment operatior is identical to the right side.";
+		enum ASSIGN_KEY = "dscanner.bugs.self_assignment";
 }
 
 unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
+	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
+	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.if_else_same_check = Check.enabled;
@@ -101,7 +88,7 @@ unittest
 	assertAnalyzerWarnings(q{
 		void foo()
 		{
-			if (auto stuff = call())
+			if (auto stuff = call()) {}
 		}
 	}c, sac);
 

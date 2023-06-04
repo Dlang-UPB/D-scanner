@@ -489,10 +489,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		checks ~= new FunctionAttributeCheck(fileName, moduleScope,
 		analysisConfig.function_attribute_check == Check.skipTests && !ut);
 
-	if (moduleName.shouldRun!IfElseSameCheck(analysisConfig))
-		checks ~= new IfElseSameCheck(fileName, moduleScope,
-		analysisConfig.if_else_same_check == Check.skipTests&& !ut);
-
 	if (moduleName.shouldRun!LabelVarNameCheck(analysisConfig))
 		checks ~= new LabelVarNameCheck(fileName, moduleScope,
 		analysisConfig.label_var_same_name_check == Check.skipTests && !ut);
@@ -649,6 +645,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new LogicPrecedenceCheck!ASTCodegen(
 			fileName,
 			config.logical_precedence_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(IfElseSameCheck!ASTCodegen)(config))
+		visitors ~= new IfElseSameCheck!ASTCodegen(
+			fileName,
+			config.if_else_same_check == Check.skipTests && !ut
 		);
 	
 	if (moduleName.shouldRunDmd!(UnusedLabelCheck!ASTCodegen)(config))
