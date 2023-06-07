@@ -5,13 +5,6 @@
 module dscanner.analysis.unused_result;
 
 import dscanner.analysis.base;
-import dscanner.analysis.mismatched_args : resolveSymbol, IdentVisitor;
-import dscanner.utils;
-import dsymbol.scope_;
-import dsymbol.symbol;
-import dparse.ast, dparse.lexer;
-import std.algorithm.searching : canFind;
-import std.range: retro;
 
 /**
  * Checks for function call statements which call non-void functions.
@@ -23,81 +16,98 @@ import std.range: retro;
  * When the return value is intentionally discarded, `cast(void)` can
  * be prepended to silence the check.
  */
-final class UnusedResultChecker : BaseAnalyzer
+extern(C++) class UnusedResultChecker(AST) : BaseAnalyzerDmd
 {
-    alias visit = BaseAnalyzer.visit;
-
+    alias visit = BaseAnalyzerDmd.visit;
     mixin AnalyzerInfo!"unused_result";
 
-private:
+    extern(D) this(string fileName, bool skipTests = false)
+	{
+		super(fileName, skipTests);
+	}
 
-    enum string KEY = "dscanner.unused_result";
-    enum string MSG = "Function return value is discarded";
+    mixin VisitInstructionBlock!(AST.WhileStatement);
+	mixin VisitInstructionBlock!(AST.ForStatement);
+	mixin VisitInstructionBlock!(AST.DoStatement);
+	mixin VisitInstructionBlock!(AST.ForeachRangeStatement);
+	mixin VisitInstructionBlock!(AST.ForeachStatement);
+	mixin VisitInstructionBlock!(AST.SwitchStatement);
+	mixin VisitInstructionBlock!(AST.SynchronizedStatement);
+	mixin VisitInstructionBlock!(AST.WithStatement);
+	mixin VisitInstructionBlock!(AST.TryCatchStatement);
+	mixin VisitInstructionBlock!(AST.TryFinallyStatement);
+    
+    override void visit(AST.CompoundStatement s)
+	{
+		foreach (st; *s.statements)
+		{
+			if (checkStatement(st))
+				addErrorMessage(cast(ulong) st.loc.linnum,
+						cast(ulong) st.loc.charnum, KEY, MSG);
 
-public:
+			st.accept(this);
+		}
+	}
 
-    const(DSymbol)* void_;
+	override void visit(AST.IfStatement s)
+	{
+		if (checkStatement(s.ifbody))
+					addErrorMessage(cast(ulong) s.ifbody.loc.linnum,
+						cast(ulong) s.ifbody.loc.charnum, KEY, MSG);
 
-    ///
-    this(string fileName, const(Scope)* sc, bool skipTests = false)
-    {
-        super(fileName, sc, skipTests);
-        void_ = sc.getSymbolsByName(internString("void"))[0];
-    }
+		if (s.elsebody && checkStatement(s.elsebody))
+					addErrorMessage(cast(ulong) s.elsebody.loc.linnum,
+						cast(ulong) s.elsebody.loc.charnum, KEY, MSG);
+		
+		super.visit(s);
+	}
 
-    override void visit(const(ExpressionStatement) decl)
-    {
-        import std.typecons : scoped;
+	bool checkStatement(AST.Statement s)
+	{
+		import dmd.astenums : TY;
 
-        super.visit(decl);
-        if (!decl.expression)
-            return;
-        if (decl.expression.items.length != 1)
-            return;
-        auto ue = cast(UnaryExpression) decl.expression.items[0];
-        if (!ue)
-            return;
-        auto fce = ue.functionCallExpression;
-        if (!fce)
-            return;
+        if (auto es = s.isExpStatement()) if (auto ce = es.exp.isCallExp())
+		{
+            if (!ce.f)
+                return false;
 
-        auto identVisitor = scoped!IdentVisitor;
-        if (fce.unaryExpression !is null)
-            identVisitor.visit(fce.unaryExpression);
-        else if (fce.type !is null)
-            identVisitor.visit(fce.type);
+			auto tf = ce.f.type.isTypeFunction();
 
-        if (!identVisitor.names.length)
-            return;
+			if (!tf)
+				return false;
 
-        const(DSymbol)*[] symbols = resolveSymbol(sc, identVisitor.names);
+			if (tf.next.ty != TY.Tvoid)
+				return true;
+		}
 
-        if (!symbols.length)
-            return;
+		return false;
+	}
 
-        foreach (sym; symbols)
-        {
-            if (!sym)
-                return;
-            if (!sym.type)
-                return;
-            if (sym.kind != CompletionKind.functionName)
-                return;
-            if (sym.type is void_)
-                return;
-        }
+	private:
+		template VisitInstructionBlock(T)
+		{
+			override void visit(T t)
+			{
+				if (checkStatement(t._body))
+					addErrorMessage(cast(ulong) t._body.loc.linnum,
+						cast(ulong) t._body.loc.charnum, KEY, MSG);
 
-        addErrorMessage(decl.expression.line, decl.expression.column, KEY, MSG);
-    }
+				super.visit(t);
+			}
+		}
+
+	enum KEY = "dscanner.performance.enum_array_literal";
+	enum string MSG = "Function return value is discarded";
 }
 
 unittest
 {
     import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-    import dscanner.analysis.helpers : assertAnalyzerWarnings;
+    import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
     import std.stdio : stderr;
     import std.format : format;
 
+    enum string MSG = "Function return value is discarded";
     StaticAnalysisConfig sac = disabledConfig();
     sac.unused_result = Check.enabled;
 
@@ -107,7 +117,7 @@ unittest
         {
             fun();
         }
-    }c, sac);
+    }c, sac, 1);
 
     assertAnalyzerWarnings(q{
         int fun() { return 1; }
@@ -115,7 +125,7 @@ unittest
         {
             fun(); // [warn]: %s
         }
-    }c.format(UnusedResultChecker.MSG), sac);
+    }c.format(MSG), sac, 1);
 
     assertAnalyzerWarnings(q{
         void main()
@@ -123,16 +133,16 @@ unittest
             void fun() {}
             fun();
         }
-    }c, sac);
+    }c, sac, 1);
 
-    version (none) // TODO: local functions
+    // version (none) // TODO: local functions
     assertAnalyzerWarnings(q{
         void main()
         {
             int fun() { return 1; }
             fun(); // [warn]: %s
         }
-    }c.format(UnusedResultChecker.MSG), sac);
+    }c.format(MSG), sac, 1);
 
     assertAnalyzerWarnings(q{
         int fun() { return 1; }
@@ -140,7 +150,7 @@ unittest
         {
             cast(void) fun();
         }
-    }c, sac);
+    }c, sac, 1);
 
     assertAnalyzerWarnings(q{
         void fun() { }
@@ -149,7 +159,7 @@ unittest
         {
             gun();
         }
-    }c, sac);
+    }c, sac, 1);
 
     import std.stdio: writeln;
     writeln("Unittest for UnusedResultChecker passed");
