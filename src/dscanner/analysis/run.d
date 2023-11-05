@@ -413,7 +413,7 @@ unittest
 		config.asm_style_check = Check.enabled;
 		// this is done automatically by inifiled
 		config.filters.asm_style_check = filters.split(",");
-		return shouldRun!AsmStyleCheck(moduleName, config);
+		return moduleName.shouldRunDmd!(AsmStyleCheck!ASTCodegen)(config);
 	}
 
 	// test inclusion
@@ -463,10 +463,6 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 	BaseAnalyzer[] checks;
 
 	GC.disable;
-
-	if (moduleName.shouldRun!AsmStyleCheck(analysisConfig))
-		checks ~= new AsmStyleCheck(fileName, moduleScope,
-		analysisConfig.asm_style_check == Check.skipTests && !ut);
 
 	if (moduleName.shouldRun!CommaExpressionCheck(analysisConfig))
 		checks ~= new CommaExpressionCheck(fileName, moduleScope,
@@ -691,6 +687,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new UselessAssertCheck!ASTCodegen(
 			fileName,
 			config.useless_assert_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(AsmStyleCheck!ASTCodegen)(config))
+		visitors ~= new AsmStyleCheck!ASTCodegen(
+			fileName,
+			config.asm_style_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
