@@ -10,12 +10,12 @@ import dmd.tokens;
 /**
  * Checks for labels that are never used.
  */
-extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
+extern (C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 {
 	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"unused_label_check";
 
-	extern(D) this(string fileName, bool skipTests = false)
+	extern (D) this(string fileName, bool skipTests = false)
 	{
 		super(fileName, skipTests);
 	}
@@ -30,17 +30,18 @@ extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 	override void visit(AST.LabelStatement ls)
 	{
 		Label* label = ls.ident.toString() in current;
-		
+
 		if (label is null)
 		{
-			current[ls.ident.toString()] = Label(ls.ident.toString(), ls.loc.linnum, ls.loc.charnum, false);
+			current[ls.ident.toString()] = Label(ls.ident.toString(),
+					ls.loc.linnum, ls.loc.charnum, false);
 		}
 		else
 		{
 			label.line = ls.loc.linnum;
 			label.column = ls.loc.charnum;
 		}
-		
+
 		super.visit(ls);
 	}
 
@@ -86,7 +87,7 @@ extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 		super.visit(fd);
 		popScope();
 	}
-	
+
 	override void visit(AST.AsmStatement as)
 	{
 		if (!as.tokens)
@@ -94,12 +95,19 @@ extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 
 		// Look for jump instructions
 		bool jmp;
-		if (as.tokens[0].ident && as.tokens[0].ident.toString()[0] == 'j')
-			jmp = true;
+
+		if (as.tokens[0].ident)
+		{
+			auto asmInstr = as.tokens[0].ident.toString();
+			if (asmInstr.ptr !is null && asmInstr[0] == 'j')
+				jmp = true;
+		}
 
 		// Last argument of the jmp instruction will be the label
-		Token *label;
-		for (label = as.tokens; label.next; label = label.next) {}
+		Token* label;
+		for (label = as.tokens; label.next; label = label.next)
+		{
+		}
 
 		if (jmp && label.ident)
 			labelUsed(label.ident.toString());
@@ -115,9 +123,9 @@ private:
 		bool used;
 	}
 
-	extern(D) Label[const(char)[]][] stack;
+	extern (D) Label[const(char)[]][] stack;
 
-	extern(D) auto ref current()
+	extern (D) auto ref current()
 	{
 		return stack[$ - 1];
 	}
@@ -146,7 +154,7 @@ private:
 		stack.length--;
 	}
 
-	extern(D) void labelUsed(const(char)[] name)
+	extern (D) void labelUsed(const(char)[] name)
 	{
 		Label* entry = name in current;
 		if (entry is null)
