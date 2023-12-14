@@ -53,8 +53,6 @@ extern (C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 
 	override void visit(AST.BreakStatement bs)
 	{
-		import std.stdio : writeln;
-
 		if (bs.ident)
 			labelUsed(bs.ident.toString());
 	}
@@ -95,13 +93,8 @@ extern (C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 
 		// Look for jump instructions
 		bool jmp;
-
-		if (as.tokens[0].ident)
-		{
-			auto asmInstr = as.tokens[0].ident.toString();
-			if (asmInstr.ptr !is null && asmInstr[0] == 'j')
-				jmp = true;
-		}
+		if (getFirstLetterOf(cast(char*) as.tokens[0].ptr) == 'j')
+			jmp = true;
 
 		// Last argument of the jmp instruction will be the label
 		Token* label;
@@ -111,6 +104,20 @@ extern (C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 
 		if (jmp && label.ident)
 			labelUsed(label.ident.toString());
+	}
+
+	private char getFirstLetterOf(char* str)
+	{
+		import std.ascii : isAlpha;
+
+		if (str is null)
+			return '\0';
+
+		for (; str && !isAlpha(*str); str++)
+		{
+		}
+
+		return *str;
 	}
 
 private:
@@ -166,13 +173,13 @@ private:
 
 unittest
 {
-	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.unused_label_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		int testUnusedLabel()
 		{
 		    int x = 0;
@@ -211,7 +218,7 @@ unittest
 		}
 	}c, sac);
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testAsm()
 		{
 			asm { jmp lbl;}
@@ -219,7 +226,7 @@ unittest
 		}
 	}c, sac);
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testAsm()
 		{
 			asm { mov RAX,1;}
@@ -228,7 +235,7 @@ unittest
 	}c, sac);
 
 	// from std.math
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		real polyImpl() {
 			asm {
 				jecxz return_ST;
@@ -237,12 +244,23 @@ unittest
 	}c, sac);
 
 	// a label might be hard to find, e.g. in a mixin
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		real polyImpl() {
 			mixin("return_ST: return 1;");
 			asm {
 				jecxz return_ST;
 		    }
+		}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+		void testAsm()
+		{
+			asm nothrow @nogc
+            {
+                "movgr2fcsr $r0,%0" :
+                : "r" (newState & (roundingMask | allExceptions));
+            }
 		}
 	}c, sac);
 
