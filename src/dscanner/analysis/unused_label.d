@@ -98,9 +98,7 @@ extern (C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 
 		// Last argument of the jmp instruction will be the label
 		Token* label;
-		for (label = as.tokens; label.next; label = label.next)
-		{
-		}
+		for (label = as.tokens; label.next; label = label.next) {}
 
 		if (jmp && label.ident)
 			labelUsed(label.ident.toString());
@@ -113,9 +111,8 @@ extern (C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 		if (str is null)
 			return '\0';
 
-		for (; str && !isAlpha(*str); str++)
-		{
-		}
+		while (str && !isAlpha(*str))
+			str++;
 
 		return *str;
 	}
