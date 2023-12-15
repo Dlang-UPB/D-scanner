@@ -123,25 +123,26 @@ else ifneq (,$(findstring gdc, $(DC)))
 endif
 SHELL:=/usr/bin/env bash
 
+ifneq (, $(findstring $(GDC), $(DC)))
+	CONFIG_CMD := $(DC) dmd/config.d -o config && ./config bin VERSION /etc && rm config;
+else
+	CONFIG_CMD := $(DC) -run dmd/config.d bin VERSION /etc;
+endif
+
 GITHASH = bin/githash.txt
 
-FIRST_RUN_FLAG := $(OBJ_DIR)/$(DC)/first_run.flag
+DC_CONFIG_FILE := bin/SYSCONFDIR.imp
+
+$(DC_CONFIG_FILE): | $(DSCANNER_BIN_DIR)
+	$(CONFIG_CMD)
 
 $(OBJ_DIR)/$(DC)/%.o: %.d
-	if [ ! -f $(FIRST_RUN_FLAG) ]; then \
-		if [[ "$(DC)" == *"$(GDC)"* ]]; then \
-			${DC} dmd/config.d -o config && ./config bin VERSION /etc; \
-		else \
-			${DC} -run dmd/config.d bin VERSION /etc; \
-		fi; \
-		touch $(FIRST_RUN_FLAG); \
-	fi
 	${DC} ${DC_FLAGS} ${VERSIONS} ${INCLUDE_PATHS} -c $< ${WRITE_TO_TARGET_NAME}
 
 $(UT_OBJ_DIR)/$(DC)/%.o: %.d
 	${DC} ${DC_TEST_FLAGS} ${VERSIONS} ${INCLUDE_PATHS} -c $< ${WRITE_TO_TARGET_NAME}
 
-${DSCANNER_BIN}: ${GITHASH} ${OBJ_BY_DC} | ${DSCANNER_BIN_DIR}
+${DSCANNER_BIN}: $(DC_CONFIG_FILE) ${GITHASH} ${OBJ_BY_DC} | ${DSCANNER_BIN_DIR}
 	${DC} ${OBJ_BY_DC} ${WRITE_TO_TARGET_NAME}
 
 ${OBJ_BY_DC}: | ${OBJ_BY_DC_DIR}
@@ -169,7 +170,7 @@ githash: ${GITHASH}
 ${GITHASH}:
 	mkdir -p bin && ${GIT} describe --tags --always > ${GITHASH}
 
-debug: ${GITHASH}
+debug: $(DC_CONFIG_FILE) ${GITHASH}
 	${DC} -w -g -Jbin -ofdsc ${VERSIONS} ${DEBUG_VERSIONS} ${INCLUDE_PATHS} ${SRC}
 
 # compile the dependencies separately, s.t. their unittests don't get executed
@@ -178,7 +179,7 @@ ${UT_DSCANNER_LIB}: ${LIB_SRC} | ${UT_DSCANNER_LIB_DIR}
 
 test: ${UT_DSCANNER_BIN}
 
-${UT_DSCANNER_BIN}: ${UT_DSCANNER_LIB} ${GITHASH} ${UT_OBJ_BY_DC} | ${DSCANNER_BIN_DIR}
+${UT_DSCANNER_BIN}: $(DC_CONFIG_FILE) ${UT_DSCANNER_LIB} ${GITHASH} ${UT_OBJ_BY_DC} | ${DSCANNER_BIN_DIR}
 	${DC} ${UT_DSCANNER_LIB} ${UT_OBJ_BY_DC} ${WRITE_TO_TARGET_NAME}
 	./${UT_DSCANNER_BIN}
 
