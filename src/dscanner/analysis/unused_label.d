@@ -10,12 +10,12 @@ import dmd.tokens;
 /**
  * Checks for labels that are never used.
  */
-extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
+extern (C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 {
 	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"unused_label_check";
 
-	extern(D) this(string fileName, bool skipTests = false)
+	extern (D) this(string fileName, bool skipTests = false)
 	{
 		super(fileName, skipTests);
 	}
@@ -30,17 +30,18 @@ extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 	override void visit(AST.LabelStatement ls)
 	{
 		Label* label = ls.ident.toString() in current;
-		
+
 		if (label is null)
 		{
-			current[ls.ident.toString()] = Label(ls.ident.toString(), ls.loc.linnum, ls.loc.charnum, false);
+			current[ls.ident.toString()] = Label(ls.ident.toString(),
+					ls.loc.linnum, ls.loc.charnum, false);
 		}
 		else
 		{
 			label.line = ls.loc.linnum;
 			label.column = ls.loc.charnum;
 		}
-		
+
 		super.visit(ls);
 	}
 
@@ -52,8 +53,6 @@ extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 
 	override void visit(AST.BreakStatement bs)
 	{
-		import std.stdio : writeln;
-
 		if (bs.ident)
 			labelUsed(bs.ident.toString());
 	}
@@ -86,7 +85,7 @@ extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 		super.visit(fd);
 		popScope();
 	}
-	
+
 	override void visit(AST.AsmStatement as)
 	{
 		if (!as.tokens)
@@ -94,15 +93,28 @@ extern(C++) class UnusedLabelCheck(AST) : BaseAnalyzerDmd
 
 		// Look for jump instructions
 		bool jmp;
-		if (as.tokens[0].ident && as.tokens[0].ident.toString()[0] == 'j')
+		if (getFirstLetterOf(cast(char*) as.tokens[0].ptr) == 'j')
 			jmp = true;
 
 		// Last argument of the jmp instruction will be the label
-		Token *label;
+		Token* label;
 		for (label = as.tokens; label.next; label = label.next) {}
 
 		if (jmp && label.ident)
 			labelUsed(label.ident.toString());
+	}
+
+	private char getFirstLetterOf(char* str)
+	{
+		import std.ascii : isAlpha;
+
+		if (str is null)
+			return '\0';
+
+		while (str && !isAlpha(*str))
+			str++;
+
+		return *str;
 	}
 
 private:
@@ -115,9 +127,9 @@ private:
 		bool used;
 	}
 
-	extern(D) Label[const(char)[]][] stack;
+	extern (D) Label[const(char)[]][] stack;
 
-	extern(D) auto ref current()
+	extern (D) auto ref current()
 	{
 		return stack[$ - 1];
 	}
@@ -146,7 +158,7 @@ private:
 		stack.length--;
 	}
 
-	extern(D) void labelUsed(const(char)[] name)
+	extern (D) void labelUsed(const(char)[] name)
 	{
 		Label* entry = name in current;
 		if (entry is null)
@@ -158,13 +170,13 @@ private:
 
 unittest
 {
-	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.unused_label_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		int testUnusedLabel()
 		{
 		    int x = 0;
@@ -203,7 +215,7 @@ unittest
 		}
 	}c, sac);
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testAsm()
 		{
 			asm { jmp lbl;}
@@ -211,7 +223,7 @@ unittest
 		}
 	}c, sac);
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testAsm()
 		{
 			asm { mov RAX,1;}
@@ -220,7 +232,7 @@ unittest
 	}c, sac);
 
 	// from std.math
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		real polyImpl() {
 			asm {
 				jecxz return_ST;
@@ -229,12 +241,23 @@ unittest
 	}c, sac);
 
 	// a label might be hard to find, e.g. in a mixin
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		real polyImpl() {
 			mixin("return_ST: return 1;");
 			asm {
 				jecxz return_ST;
 		    }
+		}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+		void testAsm()
+		{
+			asm nothrow @nogc
+            {
+                "movgr2fcsr $r0,%0" :
+                : "r" (newState & (roundingMask | allExceptions));
+            }
 		}
 	}c, sac);
 
