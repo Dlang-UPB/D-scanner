@@ -7,11 +7,8 @@ module dscanner.analysis.auto_function;
 
 import dscanner.analysis.base;
 import dscanner.analysis.helpers;
-import dparse.ast;
-import dparse.lexer;
 
 import std.stdio;
-import std.algorithm.searching : any;
 
 /**
  * Checks for auto functions without return statement.
@@ -20,139 +17,83 @@ import std.algorithm.searching : any;
  * detected by the compiler. However sometimes they can be used as a trick
  * to infer attributes.
  */
-final class AutoFunctionChecker : BaseAnalyzer
+extern(C++) class AutoFunctionChecker(AST) : BaseAnalyzerDmd
 {
-
-private:
-
-	enum string KEY = "dscanner.suspicious.missing_return";
-	enum string MESSAGE = "Auto function without return statement, prefer an explicit void";
-
-	bool[] _returns;
-	size_t _mixinDepth;
-	string[] _literalWithReturn;
-
-public:
-
-	alias visit = BaseAnalyzer.visit;
-
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"auto_function_check";
 
 	///
-	this(string fileName, bool skipTests = false)
+	extern(D) this(string fileName, bool skipTests = false)
 	{
-		super(fileName, null, skipTests);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const(FunctionDeclaration) decl)
+	override void visit(AST.FuncDeclaration d)
 	{
-		_returns.length += 1;
-		scope(exit) _returns.length -= 1;
-		_returns[$-1] = false;
+		import dmd.astenums : STC, STMT;
 
-		const bool autoFun = decl.storageClasses
-			.any!(a => a.token.type == tok!"auto" || a.atAttribute !is null);
+		if (d.storage_class & STC.disable)
+			return;
 
-		decl.accept(this);
-
-		if (decl.functionBody.specifiedFunctionBody && autoFun && !_returns[$-1])
-			addErrorMessage(decl.name.line, decl.name.column, KEY, MESSAGE);
-	}
-
-	override void visit(const(ReturnStatement) rst)
-	{
-		if (_returns.length)
-			_returns[$-1] = true;
-		rst.accept(this);
-	}
-
-	override void visit(const(AssertArguments) exp)
-	{
-		exp.accept(this);
-		if (_returns.length)
+		if (!(d.storage_class & STC.auto_) && !d.inferRetType)
 		{
-			const UnaryExpression u = cast(UnaryExpression) exp.assertion;
-			if (!u)
-				return;
-			const PrimaryExpression p = u.primaryExpression;
-			if (!p)
-				return;
-
-			immutable token = p.primary;
-			if (token.type == tok!"false")
-				_returns[$-1] = true;
-			else if (token.text == "0")
-				_returns[$-1] = true;
+			super.visitFuncBody(d);
+			return;
 		}
-	}
 
-	override void visit(const(MixinExpression) mix)
-	{
-		++_mixinDepth;
-		mix.accept(this);
-		--_mixinDepth;
-	}
+		// arrow functions
+		if (auto rs = d.fbody.isReturnStatement())
+			return;
 
-	override void visit(const(PrimaryExpression) exp)
-	{
-		exp.accept(this);
+		// // fbody is either return or compound statement
+		auto cs = d.fbody.isCompoundStatement();
 
-		import std.algorithm.searching : canFind;
-
-		if (_returns.length && _mixinDepth)
+		// look for asser(0) or assert(false)
+		foreach (s; *cs.statements)
 		{
-			if (findReturnInLiteral(exp.primary.text))
-			    _returns[$-1] = true;
-			else if (exp.identifierOrTemplateInstance &&
-				_literalWithReturn.canFind(exp.identifierOrTemplateInstance.identifier.text))
-					_returns[$-1] = true;
+			AST.ExpStatement es = s.isExpStatement();
+			AST.AssertExp ae = null;
+
+			if (es && es.exp)
+				ae = es.exp.isAssertExp();
+
+			if (ae)
+			{
+				auto ie = ae.e1.isIntegerExp();
+
+				if (ie && ie.getInteger() == 0)
+				{
+					super.visitFuncBody(d);
+					return;
+				}
+			}
 		}
+
+		foundReturnStatement = false;
+		super.visitFuncBody(d);
+
+		if (!foundReturnStatement)
+			addErrorMessage(cast(ulong) d.loc.linnum, cast(ulong) d.loc.charnum, KEY, MESSAGE);
 	}
 
-	private bool findReturnInLiteral(const(string) value)
+	override void visit(AST.StaticForeachStatement s)
 	{
-		import std.algorithm.searching : find;
-		import std.range : empty;
+		if (s.sfe.aggrfe)
+			super.visit(s.sfe.aggrfe);
 
-		return value == "return" || !value.find("return ").empty;
+		if (s.sfe.rangefe)
+			super.visit(s.sfe.rangefe);
 	}
 
-	private bool stringliteralHasReturn(const(NonVoidInitializer) nvi)
+	override void visit(AST.ReturnStatement s)
 	{
-		bool result;
-		if (!nvi.assignExpression || (cast(UnaryExpression) nvi.assignExpression) is null)
-			return result;
-
-		const(UnaryExpression) u = cast(UnaryExpression) nvi.assignExpression;
-		if (u.primaryExpression &&
-			u.primaryExpression.primary.type.isStringLiteral &&
-			findReturnInLiteral(u.primaryExpression.primary.text))
-				result = true;
-
-		return result;
+		foundReturnStatement = true;
 	}
 
-	override void visit(const(AutoDeclaration) decl)
-	{
-		decl.accept(this);
-
-		foreach(const(AutoDeclarationPart) p; decl.parts)
-			if (p.initializer &&
-				p.initializer.nonVoidInitializer &&
-				stringliteralHasReturn(p.initializer.nonVoidInitializer))
-					_literalWithReturn ~= p.identifier.text.idup;
-	}
-
-	override void visit(const(VariableDeclaration) decl)
-	{
-		decl.accept(this);
-
-		foreach(const(Declarator) d; decl.declarators)
-			if (d.initializer &&
-				d.initializer.nonVoidInitializer &&
-				stringliteralHasReturn(d.initializer.nonVoidInitializer))
-					_literalWithReturn ~= d.name.text.idup;
-	}
+private:
+	bool foundReturnStatement;
+	enum string KEY = "dscanner.suspicious.missing_return";
+	enum string MESSAGE = "Auto function without return statement, prefer an explicit void";
 }
 
 unittest
@@ -160,78 +101,63 @@ unittest
 	import std.stdio : stderr;
 	import std.format : format;
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarnings;
+	import dscanner.analysis.helpers : assertAnalyzerWarnings = assertAnalyzerWarningsDMD;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.auto_function_check = Check.enabled;
+	
 	assertAnalyzerWarnings(q{
-		auto ref doStuff(){} // [warn]: %s
-		auto doStuff(){} // [warn]: %s
-		int doStuff(){auto doStuff(){}} // [warn]: %s
-		auto doStuff(){return 0;}
-		int doStuff(){/*error but not the aim*/}
-	}c.format(
-		AutoFunctionChecker.MESSAGE,
-		AutoFunctionChecker.MESSAGE,
-		AutoFunctionChecker.MESSAGE,
-	), sac);
+		auto ref doStuff1(){} // [warn]: Auto function without return statement, prefer an explicit void
+		auto doStuff2(){} // [warn]: Auto function without return statement, prefer an explicit void
+		
+		int doStuff3()
+		{
+			auto doStuff(){} // [warn]: Auto function without return statement, prefer an explicit void
+			return 0;
+		}
+		
+		auto doStuff4(){return 0;}
+	}c, sac, true);
 
 	assertAnalyzerWarnings(q{
-		auto doStuff(){assert(true);} // [warn]: %s
-		auto doStuff(){assert(false);}
-	}c.format(
-		AutoFunctionChecker.MESSAGE,
-	), sac);
+		auto doStuff1(){assert(true);} // [warn]: Auto function without return statement, prefer an explicit void
+		auto doStuff2(){assert(false);}
+	}c, sac, true);
 
 	assertAnalyzerWarnings(q{
-		auto doStuff(){assert(1);} // [warn]: %s
-		auto doStuff(){assert(0);}
-	}c.format(
-		AutoFunctionChecker.MESSAGE,
-	), sac);
+		auto doStuff1(){assert(1);} // [warn]: Auto function without return statement, prefer an explicit void
+		auto doStuff2(){assert(0);}
+	}c, sac, true);
 
 	assertAnalyzerWarnings(q{
-		auto doStuff(){mixin("0+0");} // [warn]: %s
-		auto doStuff(){mixin("return 0;");}
-	}c.format(
-		AutoFunctionChecker.MESSAGE,
-	), sac);
+		auto doStuff1() // [warn]: Auto function without return statement, prefer an explicit void
+		{
+			mixin("int a = 0 + 0;");
+		}
+		
+		auto doStuff2(){mixin("return 0;");}
+	}c, sac, true);
 
 	assertAnalyzerWarnings(q{
-		auto doStuff(){mixin("0+0");} // [warn]: %s
-		auto doStuff(){mixin("static if (true)" ~ "  return " ~ 0.stringof ~ ";");}
-	}c.format(
-		AutoFunctionChecker.MESSAGE,
-	), sac);
+		auto doStuff1() // [warn]: Auto function without return statement, prefer an explicit void
+		{
+			mixin("int a = 0;");
+		}
+
+		auto doStuff2(){mixin("static if (true)" ~ "  return " ~ 0.stringof ~ ";");}
+	}c, sac, true);
 
 	assertAnalyzerWarnings(q{
-		auto doStuff(){} // [warn]: %s
-		extern(C) auto doStuff();
-	}c.format(
-		AutoFunctionChecker.MESSAGE,
-	), sac);
+		auto doStuff1(){} // [warn]: Auto function without return statement, prefer an explicit void
+		@disable auto doStuff2() {}
+	}c, sac, true);
 
 	assertAnalyzerWarnings(q{
-		auto doStuff(){} // [warn]: %s
-		@disable auto doStuff();
-	}c.format(
-		AutoFunctionChecker.MESSAGE,
-	), sac);
-
-	assertAnalyzerWarnings(q{
-		@property doStuff(){} // [warn]: %s
-		@safe doStuff(){} // [warn]: %s
-		@disable doStuff();
-		@safe void doStuff();
-	}c.format(
-		AutoFunctionChecker.MESSAGE,
-		AutoFunctionChecker.MESSAGE,
-	), sac);
-
-	assertAnalyzerWarnings(q{
-		enum _genSave = "return true;";
-		auto doStuff(){ mixin(_genSave);}
-	}, sac);
+		@property doStuff1(){} // [warn]: Auto function without return statement, prefer an explicit void
+		@safe doStuff2(){} // [warn]: Auto function without return statement, prefer an explicit void
+		@disable doStuff3() {}
+		@safe void doStuff4();
+	}c, sac, true);
 
 	stderr.writeln("Unittest for AutoFunctionChecker passed.");
 }
