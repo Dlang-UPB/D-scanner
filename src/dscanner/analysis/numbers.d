@@ -5,57 +5,72 @@
 
 module dscanner.analysis.numbers;
 
-import std.stdio;
-import std.regex;
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
-import dscanner.analysis.helpers;
-import dsymbol.scope_ : Scope;
+import dmd.tokens : TOK;
+import std.conv;
+import std.regex;
+import std.stdio;
 
 /**
  * Checks for long and hard-to-read number literals
  */
-final class NumberStyleCheck : BaseAnalyzer
+extern (C++) class NumberStyleCheck(AST) : BaseAnalyzerDmd
 {
-public:
-	alias visit = BaseAnalyzer.visit;
-
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"number_style_check";
 
-	/**
-	 * Constructs the style checker with the given file name.
-	 */
-	this(BaseAnalyzerArguments args)
+	private enum KEY = "dscanner.style.number_literals";
+	private enum string MSG = "Use underscores to improve number constant readability.";
+
+	private auto badBinaryRegex = ctRegex!(`^0b[01]{9,}`);
+	private auto badDecimalRegex = ctRegex!(`^\d{5,}`);
+
+	extern (D) this(string fileName, bool skipTests = false)
 	{
-		super(args);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const Token t)
+	override void visit(AST.IntegerExp intExpr)
 	{
-		import std.algorithm : startsWith;
+		import dscanner.utils : readFile;
+		import dmd.errorsink : ErrorSinkNull;
+		import dmd.globals : global;
+		import dmd.lexer : Lexer;
 
-		if (isNumberLiteral(t.type) && !t.text.startsWith("0x")
-				&& ((t.text.startsWith("0b") && !t.text.matchFirst(badBinaryRegex)
-					.empty) || !t.text.matchFirst(badDecimalRegex).empty))
-		{
-			addErrorMessage(t, "dscanner.style.number_literals",
-					"Use underscores to improve number constant readability.");
-		}
+		auto bytes = readFile(fileName) ~ '\0';
+		bytes = bytes[intExpr.loc.fileOffset .. $];
+
+		__gshared ErrorSinkNull errorSinkNull;
+		if (!errorSinkNull)
+			errorSinkNull = new ErrorSinkNull;
+
+		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0, errorSinkNull, &global.compileEnv);
+		lexer.nextToken();
+
+		auto tokenValue = lexer.token.value;
+		auto tokenText = to!string(lexer.token.ptr);
+
+		if (!isIntegerLiteral(tokenValue))
+			return;
+
+		if (!matchFirst(tokenText, badDecimalRegex).empty || !matchFirst(tokenText, badBinaryRegex).empty)
+			addErrorMessage(intExpr.loc.linnum, intExpr.loc.charnum, KEY, MSG);
 	}
 
-private:
-	auto badBinaryRegex = ctRegex!(`^0b[01]{9,}`);
-	auto badDecimalRegex = ctRegex!(`^\d{5,}`);
+	private bool isIntegerLiteral(TOK token)
+	{
+		return token >= TOK.int32Literal && token <= TOK.uns128Literal;
+	}
 }
 
 unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.number_style_check = Check.enabled;
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 		void testNumbers()
 		{
 			int a;
@@ -63,12 +78,9 @@ unittest
 			a = 10; // ok
 			a = 100; // ok
 			a = 1000; // ok
-			a = 10000; /+
-			    ^^^^^ [warn]: Use underscores to improve number constant readability. +/
-			a = 100000; /+
-			    ^^^^^^ [warn]: Use underscores to improve number constant readability. +/
-			a = 1000000; /+
-			    ^^^^^^^ [warn]: Use underscores to improve number constant readability. +/
+			a = 10000; // [warn]: Use underscores to improve number constant readability.
+			a = 100000; // [warn]: Use underscores to improve number constant readability.
+			a = 1000000; // [warn]: Use underscores to improve number constant readability.
 		}
 	}c, sac);
 
