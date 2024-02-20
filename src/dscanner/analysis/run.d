@@ -904,10 +904,6 @@ private BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		checks ~= new IfConstraintsIndentCheck(args.setSkipTests(
 		analysisConfig.if_constraints_indent == Check.skipTests && !ut));
 
-	if (moduleName.shouldRun!UnusedResultChecker(analysisConfig))
-		checks ~= new UnusedResultChecker(args.setSkipTests(
-		analysisConfig.unused_result == Check.skipTests && !ut));
-
 	if (moduleName.shouldRun!CyclomaticComplexityCheck(analysisConfig))
 		checks ~= new CyclomaticComplexityCheck(args.setSkipTests(
 		analysisConfig.cyclomatic_complexity == Check.skipTests && !ut),
@@ -1347,6 +1343,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new IfElseSameCheck!ASTCodegen(
 			fileName,
 			config.if_else_same_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(UnusedResultChecker!ASTCodegen)(config))
+		visitors ~= new UnusedResultChecker!ASTCodegen(
+			fileName,
+			config.unused_result == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
