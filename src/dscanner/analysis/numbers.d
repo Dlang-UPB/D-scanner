@@ -89,6 +89,9 @@ unittest
 			a = 10; // ok
 			a = 100; // ok
 			a = 1000; // ok
+			a = 10_00; // ok
+			a = 10_000; // ok
+			a = 100_000; // ok
 			a = 10000; // [warn]: Use underscores to improve number constant readability.
 			a = 100000; // [warn]: Use underscores to improve number constant readability.
 			a = 1000000; // [warn]: Use underscores to improve number constant readability.
