@@ -9,7 +9,6 @@ import dscanner.analysis.base;
 import dmd.tokens : TOK;
 import std.conv;
 import std.regex;
-import std.stdio;
 
 /**
  * Checks for long and hard-to-read number literals
@@ -45,13 +44,24 @@ extern (C++) class NumberStyleCheck(AST) : BaseAnalyzerDmd
 			errorSinkNull = new ErrorSinkNull;
 
 		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0, errorSinkNull, &global.compileEnv);
-		lexer.nextToken();
+		auto tokenValue = lexer.nextToken();
+		bool isInt = false;
 
-		auto tokenValue = lexer.token.value;
-		auto tokenText = to!string(lexer.token.ptr);
+		while (tokenValue != TOK.semicolon && tokenValue != TOK.endOfFile)
+		{
+			if (isIntegerLiteral(tokenValue))
+			{
+				isInt = true;
+				break;
+			}
 
-		if (!isIntegerLiteral(tokenValue))
+			tokenValue = lexer.nextToken();
+		}
+
+		if (!isInt)
 			return;
+
+		auto tokenText = to!string(lexer.token.ptr);
 
 		if (!matchFirst(tokenText, badDecimalRegex).empty || !matchFirst(tokenText, badBinaryRegex).empty)
 			addErrorMessage(intExpr.loc.linnum, intExpr.loc.charnum, KEY, MSG);
@@ -67,6 +77,7 @@ unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
 	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
+	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.number_style_check = Check.enabled;
