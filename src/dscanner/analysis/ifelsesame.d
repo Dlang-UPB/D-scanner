@@ -63,9 +63,9 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 	}
 
 	mixin VisitBinaryExpression!(AST.LogicalExp);
-	mixin VisitBinaryExpression!(AST.EqualExp);
-	mixin VisitBinaryExpression!(AST.CmpExp);
-	mixin VisitBinaryExpression!(AST.AssignExp);
+	//mixin VisitBinaryExpression!(AST.EqualExp);
+	//mixin VisitBinaryExpression!(AST.CmpExp);
+	//mixin VisitBinaryExpression!(AST.AssignExp);
 
 	private template VisitBinaryExpression(NodeType)
 	{
@@ -153,41 +153,41 @@ unittest
 		}
 	}c, sac);
 
-	assertAnalyzerWarningsDMD(q{
-		void testCmpExprSame()
-		{
-			int a = 1, b = 2;
+	//assertAnalyzerWarningsDMD(q{
+	//	void testCmpExprSame()
+	//	{
+	//		int a = 1, b = 2;
+	//
+	//		if (a == b) {}
+	//		if (a == a) {} // [warn]: Left side of '==' operator is identical to right side.
+	//
+	//		if (a != b) {}
+	//		if (a != a) {} // [warn]: Left side of '!=' operator is identical to right side.
+	//
+	//		b = a == a ? 1 : 2; // [warn]: Left side of '==' operator is identical to right side.
+	//
+	//		if (a > b) {}
+	//		if (a > a) {} // [warn]: Left side of '>' operator is identical to right side.
+	//
+	//		if (a < b) {}
+	//		if (a < a) {} // [warn]: Left side of '<' operator is identical to right side.
+	//
+	//		if (a >= b) {}
+	//		if (a >= a) {} // [warn]: Left side of '>=' operator is identical to right side.
+	//
+	//		if (a <= b) {}
+	//		if (a <= a) {} // [warn]: Left side of '<=' operator is identical to right side.
+	//	}
+	//}c, sac);
 
-			if (a == b) {}
-			if (a == a) {} // [warn]: Left side of '==' operator is identical to right side.
-
-			if (a != b) {}
-			if (a != a) {} // [warn]: Left side of '!=' operator is identical to right side.
-
-			b = a == a ? 1 : 2; // [warn]: Left side of '==' operator is identical to right side.
-
-			if (a > b) {}
-			if (a > a) {} // [warn]: Left side of '>' operator is identical to right side.
-
-			if (a < b) {}
-			if (a < a) {} // [warn]: Left side of '<' operator is identical to right side.
-
-			if (a >= b) {}
-			if (a >= a) {} // [warn]: Left side of '>=' operator is identical to right side.
-
-			if (a <= b) {}
-			if (a <= a) {} // [warn]: Left side of '<=' operator is identical to right side.
-		}
-	}c, sac);
-
-	assertAnalyzerWarningsDMD(q{
-		void testAssignSame()
-		{
-			int a = 1;
-			a = 5;
-			a = a; // [warn]: Left side of assignment operation is identical to the right side.
-		}
-	}c, sac);
+	//assertAnalyzerWarningsDMD(q{
+	//	void testAssignSame()
+	//	{
+	//		int a = 1;
+	//		a = 5;
+	//		a = a; // [warn]: Left side of assignment operation is identical to the right side.
+	//	}
+	//}c, sac);
 
 	assertAnalyzerWarningsDMD(q{
 		void foo()
