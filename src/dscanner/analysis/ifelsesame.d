@@ -5,111 +5,228 @@
 
 module dscanner.analysis.ifelsesame;
 
-import std.stdio;
-import dparse.ast;
-import dparse.lexer;
 import dscanner.analysis.base;
-import dscanner.analysis.helpers;
-import dsymbol.scope_ : Scope;
+import dmd.hdrgen : toChars;
+import dmd.tokens : EXP;
+import std.conv : to;
+import std.string : format;
 
 /**
  * Checks for duplicated code in conditional and logical expressions.
  * $(UL
  * $(LI If statements whose "then" block is the same as the "else" block)
  * $(LI || and && expressions where the left and right are the same)
- * $(LI == expressions where the left and right are the same)
+ * $(LI == and != expressions where the left and right are the same)
+ * $(LI >, <, >=, and <= expressions where the left and right are the same)
  * )
  */
-final class IfElseSameCheck : BaseAnalyzer
+extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzer.visit;
-
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"if_else_same_check";
 
-	this(BaseAnalyzerArguments args)
+	private enum IF_KEY = "dscanner.bugs.if_else_same";
+	private enum IF_MESSAGE = "'Else' branch is identical to 'Then' branch.";
+
+	private enum LOGICAL_EXP_KEY = "dscanner.bugs.logic_operator_operands";
+	private enum LOGICAL_EXP_MESSAGE = "Left side of logical %s is identical to right side.";
+
+	private enum CMP_KEY = "dscanner.bugs.comparison_operator_operands";
+	private enum CMP_MESSAGE = "Left side of %s operator is identical to right side.";
+
+	private enum ASSIGN_KEY = "dscanner.bugs.self_assignment";
+	private enum ASSIGN_MESSAGE = "Left side of assignment operatior is identical to the right side.";
+
+	extern (D) this(string fileName, bool skipTests = false)
 	{
-		super(args);
+		super(fileName, skipTests);
 	}
 
-	override void visit(const IfStatement ifStatement)
+	override void visit(AST.IfStatement ifStatement)
 	{
-		if (ifStatement.thenStatement && (ifStatement.thenStatement == ifStatement.elseStatement))
+		super.visit(ifStatement);
+
+		if (ifStatement.ifbody is null || ifStatement.elsebody is null)
+			return;
+
+		auto thenBody = to!string(toChars(ifStatement.ifbody));
+		auto elseBody = to!string(toChars(ifStatement.elsebody));
+
+		if (thenBody == elseBody)
 		{
-			const(Token)[] tokens = ifStatement.elseStatement.tokens;
-			// extend 1 past, so we include the `else` token
-			tokens = (tokens.ptr - 1)[0 .. tokens.length + 1];
-			addErrorMessage(tokens,
-					"dscanner.bugs.if_else_same", "'Else' branch is identical to 'Then' branch.");
+			auto lineNum = cast(ulong) ifStatement.loc.linnum;
+			auto charNum = cast(ulong) ifStatement.loc.charnum;
+			addErrorMessage(lineNum, charNum, IF_KEY, IF_MESSAGE);
 		}
-		ifStatement.accept(this);
 	}
 
-	override void visit(const AssignExpression assignExpression)
+	override void visit(AST.LogicalExp logicalExpr)
 	{
-		auto e = cast(const AssignExpression) assignExpression.expression;
-		if (e !is null && assignExpression.operator == tok!"="
-				&& e.ternaryExpression == assignExpression.ternaryExpression)
+		super.visit(logicalExpr);
+
+		auto expr1 = to!string(toChars(logicalExpr.e1));
+		auto expr2 = to!string(toChars(logicalExpr.e2));
+
+		if (expr1 == expr2)
 		{
-			addErrorMessage(assignExpression, "dscanner.bugs.self_assignment",
-					"Left side of assignment operatior is identical to the right side.");
+			auto lineNum = cast(ulong) logicalExpr.loc.linnum;
+			auto charNum = cast(ulong) logicalExpr.loc.charnum;
+			auto errorMsg = LOGICAL_EXP_MESSAGE.format(exprOpToString(logicalExpr.op));
+			addErrorMessage(lineNum, charNum, LOGICAL_EXP_KEY, errorMsg);
 		}
-		assignExpression.accept(this);
 	}
 
-	override void visit(const AndAndExpression andAndExpression)
+	override void visit(AST.EqualExp equalExp)
 	{
-		if (andAndExpression.left !is null && andAndExpression.right !is null
-				&& andAndExpression.left == andAndExpression.right)
+		super.visit(equalExp);
+
+		auto expr1 = to!string(toChars(equalExp.e1));
+		auto expr2 = to!string(toChars(equalExp.e2));
+
+		if (expr1 == expr2)
 		{
-			addErrorMessage(andAndExpression.right,
-					"dscanner.bugs.logic_operator_operands",
-					"Left side of logical and is identical to right side.");
+			auto lineNum = cast(ulong) equalExp.loc.linnum;
+			auto charNum = cast(ulong) equalExp.loc.charnum;
+			auto errorMsg = CMP_MESSAGE.format(exprOpToString(equalExp.op));
+			addErrorMessage(lineNum, charNum, CMP_KEY, errorMsg);
 		}
-		andAndExpression.accept(this);
 	}
 
-	override void visit(const OrOrExpression orOrExpression)
+	override void visit(AST.CmpExp cmpExp)
 	{
-		if (orOrExpression.left !is null && orOrExpression.right !is null
-				&& orOrExpression.left == orOrExpression.right)
+		super.visit(cmpExp);
+
+		auto expr1 = to!string(toChars(cmpExp.e1));
+		auto expr2 = to!string(toChars(cmpExp.e2));
+
+		if (expr1 == expr2)
 		{
-			addErrorMessage(orOrExpression.right,
-					"dscanner.bugs.logic_operator_operands",
-					"Left side of logical or is identical to right side.");
+			auto lineNum = cast(ulong) cmpExp.loc.linnum;
+			auto charNum = cast(ulong) cmpExp.loc.charnum;
+			auto errorMsg = CMP_MESSAGE.format(exprOpToString(cmpExp.op));
+			addErrorMessage(lineNum, charNum, CMP_KEY, errorMsg);
 		}
-		orOrExpression.accept(this);
+	}
+
+	override void visit(AST.AssignExp assignExp)
+	{
+		super.visit(assignExp);
+
+		auto expr1 = to!string(toChars(assignExp.e1));
+		auto expr2 = to!string(toChars(assignExp.e2));
+
+		if (expr1 == expr2)
+		{
+			auto lineNum = cast(ulong) assignExp.loc.linnum;
+			auto charNum = cast(ulong) assignExp.loc.charnum;
+			addErrorMessage(lineNum, charNum, ASSIGN_KEY, ASSIGN_MESSAGE);
+		}
+	}
+
+	private extern (D) string exprOpToString(EXP op)
+	{
+		switch (op)
+		{
+		case EXP.orOr:
+			return "or";
+		case EXP.andAnd:
+			return "and";
+		case EXP.equal:
+			return "'=='";
+		case EXP.notEqual:
+			return "'!='";
+		case EXP.lessThan:
+			return "'<'";
+		case EXP.lessOrEqual:
+			return "'<='";
+		case EXP.greaterThan:
+			return "'>'";
+		case EXP.greaterOrEqual:
+			return "'>='";
+		default:
+			return "unknown";
+		}
 	}
 }
 
 unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
+	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.if_else_same_check = Check.enabled;
-	assertAnalyzerWarnings(q{
-		void testSizeT()
+
+	assertAnalyzerWarningsDMD(q{
+		void testThenElseSame()
 		{
 			string person = "unknown";
-			if (person == "unknown")
-				person = "bobrick"; /* same */
+			if (person == "unknown") // [warn]: 'Else' branch is identical to 'Then' branch.
+				person = "bobrick";
 			else
-				person = "bobrick"; /* same */ /+
-^^^^^^^^^^^^^^^^^^^^^^^ [warn]: 'Else' branch is identical to 'Then' branch. +/
-			// note: above ^^^ line spans over multiple lines, so it starts at start of line, since we don't have any way to test this here
-			// look at the tests using 1-wide tab width for accurate visuals.
+				person = "bobrick";
 
-			if (person == "unknown") // ok
-				person = "ricky"; // not same
+			if (person == "unknown")
+				person = "ricky";
 			else
-				person = "bobby"; // not same
+				person = "bobby";
 		}
 	}c, sac);
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
+		void testLogicalExprSame()
+		{
+			int a = 1, b = 2;
+
+			if (a == 1 && b == 1) {}
+			if (a == 1 && a == 1) {} // [warn]: Left side of logical and is identical to right side.
+
+			if (a == 1 || b == 1) {}
+			if (a == 1 || a == 1) {} // [warn]: Left side of logical or is identical to right side.
+		}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+		void testCmpExprSame()
+		{
+			int a = 1, b = 2;
+
+			if (a == b) {}
+			if (a == a) {} // [warn]: Left side of '==' operator is identical to right side.
+
+			if (a != b) {}
+			if (a != a) {} // [warn]: Left side of '!=' operator is identical to right side.
+
+			b = a == a ? 1 : 2; // [warn]: Left side of '==' operator is identical to right side.
+
+			if (a > b) {}
+			if (a > a) {} // [warn]: Left side of '>' operator is identical to right side.
+
+			if (a < b) {}
+			if (a < a) {} // [warn]: Left side of '<' operator is identical to right side.
+
+			if (a >= b) {}
+			if (a >= a) {} // [warn]: Left side of '>=' operator is identical to right side.
+
+			if (a <= b) {}
+			if (a <= a) {} // [warn]: Left side of '<=' operator is identical to right side.
+		}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+		void testAssignSame()
+		{
+			int a = 1;
+			a = 5;
+			a = a; // [warn]: Left side of assignment operatior is identical to the right side.
+		}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
 		void foo()
 		{
-			if (auto stuff = call())
+			if (auto stuff = call()) {}
 		}
 	}c, sac);
 

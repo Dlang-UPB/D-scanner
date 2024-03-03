@@ -843,10 +843,6 @@ private BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		checks ~= new FunctionAttributeCheck(args.setSkipTests(
 		analysisConfig.function_attribute_check == Check.skipTests && !ut));
 
-	if (moduleName.shouldRun!IfElseSameCheck(analysisConfig))
-		checks ~= new IfElseSameCheck(args.setSkipTests(
-		analysisConfig.if_else_same_check == Check.skipTests&& !ut));
-
 	if (moduleName.shouldRun!LabelVarNameCheck(analysisConfig))
 		checks ~= new LabelVarNameCheck(args.setSkipTests(
 		analysisConfig.label_var_same_name_check == Check.skipTests && !ut));
@@ -1343,6 +1339,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new RedundantStorageClassCheck!ASTCodegen(
 			fileName,
 			config.redundant_storage_classes == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(IfElseSameCheck!ASTCodegen)(config))
+		visitors ~= new IfElseSameCheck!ASTCodegen(
+			fileName,
+			config.if_else_same_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
