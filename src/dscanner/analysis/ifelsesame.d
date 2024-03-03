@@ -10,6 +10,7 @@ import dmd.hdrgen : toChars;
 import dmd.tokens : EXP;
 import std.conv : to;
 import std.string : format;
+import std.typecons : Tuple, tuple;
 
 /**
  * Checks for duplicated code in conditional and logical expressions.
@@ -18,6 +19,7 @@ import std.string : format;
  * $(LI || and && expressions where the left and right are the same)
  * $(LI == and != expressions where the left and right are the same)
  * $(LI >, <, >=, and <= expressions where the left and right are the same)
+ * $(LI Assignments where the left and right are the same)
  * )
  */
 extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
@@ -35,7 +37,7 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 	private enum CMP_MESSAGE = "Left side of %s operator is identical to right side.";
 
 	private enum ASSIGN_KEY = "dscanner.bugs.self_assignment";
-	private enum ASSIGN_MESSAGE = "Left side of assignment operatior is identical to the right side.";
+	private enum ASSIGN_MESSAGE = "Left side of assignment operation is identical to the right side.";
 
 	extern (D) this(string fileName, bool skipTests = false)
 	{
@@ -60,92 +62,56 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 		}
 	}
 
-	override void visit(AST.LogicalExp logicalExpr)
+	mixin VisitBinaryExpression!(AST.LogicalExp);
+	mixin VisitBinaryExpression!(AST.EqualExp);
+	mixin VisitBinaryExpression!(AST.CmpExp);
+	mixin VisitBinaryExpression!(AST.AssignExp);
+
+	private template VisitBinaryExpression(NodeType)
 	{
-		super.visit(logicalExpr);
-
-		auto expr1 = to!string(toChars(logicalExpr.e1));
-		auto expr2 = to!string(toChars(logicalExpr.e2));
-
-		if (expr1 == expr2)
+		override void visit(NodeType node)
 		{
-			auto lineNum = cast(ulong) logicalExpr.loc.linnum;
-			auto charNum = cast(ulong) logicalExpr.loc.charnum;
-			auto errorMsg = LOGICAL_EXP_MESSAGE.format(exprOpToString(logicalExpr.op));
-			addErrorMessage(lineNum, charNum, LOGICAL_EXP_KEY, errorMsg);
+			super.visit(node);
+
+			auto expr1 = to!string(toChars(node.e1));
+			auto expr2 = to!string(toChars(node.e2));
+
+			if (expr1 == expr2)
+			{
+				auto lineNum = cast(ulong) node.loc.linnum;
+				auto charNum = cast(ulong) node.loc.charnum;
+				auto errorInfo = getErrorInfo(node.op);
+				addErrorMessage(lineNum, charNum, errorInfo[0], errorInfo[1]);
+			}
 		}
 	}
 
-	override void visit(AST.EqualExp equalExp)
-	{
-		super.visit(equalExp);
-
-		auto expr1 = to!string(toChars(equalExp.e1));
-		auto expr2 = to!string(toChars(equalExp.e2));
-
-		if (expr1 == expr2)
-		{
-			auto lineNum = cast(ulong) equalExp.loc.linnum;
-			auto charNum = cast(ulong) equalExp.loc.charnum;
-			auto errorMsg = CMP_MESSAGE.format(exprOpToString(equalExp.op));
-			addErrorMessage(lineNum, charNum, CMP_KEY, errorMsg);
-		}
-	}
-
-	override void visit(AST.CmpExp cmpExp)
-	{
-		super.visit(cmpExp);
-
-		auto expr1 = to!string(toChars(cmpExp.e1));
-		auto expr2 = to!string(toChars(cmpExp.e2));
-
-		if (expr1 == expr2)
-		{
-			auto lineNum = cast(ulong) cmpExp.loc.linnum;
-			auto charNum = cast(ulong) cmpExp.loc.charnum;
-			auto errorMsg = CMP_MESSAGE.format(exprOpToString(cmpExp.op));
-			addErrorMessage(lineNum, charNum, CMP_KEY, errorMsg);
-		}
-	}
-
-	override void visit(AST.AssignExp assignExp)
-	{
-		super.visit(assignExp);
-
-		auto expr1 = to!string(toChars(assignExp.e1));
-		auto expr2 = to!string(toChars(assignExp.e2));
-
-		if (expr1 == expr2)
-		{
-			auto lineNum = cast(ulong) assignExp.loc.linnum;
-			auto charNum = cast(ulong) assignExp.loc.charnum;
-			addErrorMessage(lineNum, charNum, ASSIGN_KEY, ASSIGN_MESSAGE);
-		}
-	}
-
-	private extern (D) string exprOpToString(EXP op)
+	private extern (D) Tuple!(string, string) getErrorInfo(EXP op)
 	{
 		switch (op)
 		{
 		case EXP.orOr:
-			return "or";
+			return tuple(LOGICAL_EXP_KEY, LOGICAL_EXP_MESSAGE.format("or"));
 		case EXP.andAnd:
-			return "and";
+			return tuple(LOGICAL_EXP_KEY, LOGICAL_EXP_MESSAGE.format("and"));
 		case EXP.equal:
-			return "'=='";
+			return tuple(CMP_KEY, CMP_MESSAGE.format("'=='"));
 		case EXP.notEqual:
-			return "'!='";
+			return tuple(CMP_KEY, CMP_MESSAGE.format("'!='"));
 		case EXP.lessThan:
-			return "'<'";
+			return tuple(CMP_KEY, CMP_MESSAGE.format("'<'"));
 		case EXP.lessOrEqual:
-			return "'<='";
+			return tuple(CMP_KEY, CMP_MESSAGE.format("'<='"));
 		case EXP.greaterThan:
-			return "'>'";
+			return tuple(CMP_KEY, CMP_MESSAGE.format("'>'"));
 		case EXP.greaterOrEqual:
-			return "'>='";
+			return tuple(CMP_KEY, CMP_MESSAGE.format("'>='"));
+		case EXP.assign:
+			return tuple(ASSIGN_KEY, ASSIGN_MESSAGE);
 		default:
-			return "unknown";
+			assert(0);
 		}
+
 	}
 }
 
@@ -219,7 +185,7 @@ unittest
 		{
 			int a = 1;
 			a = 5;
-			a = a; // [warn]: Left side of assignment operatior is identical to the right side.
+			a = a; // [warn]: Left side of assignment operation is identical to the right side.
 		}
 	}c, sac);
 
