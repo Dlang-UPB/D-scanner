@@ -208,5 +208,42 @@ unittest
         }
     }c, sac, true);
 
+	assertAnalyzerWarningsDMD(q{
+        int fun() { return 1; }
+        void main()
+        {
+        	if (true)
+            	fun(); // [warn]: %s
+            else
+            	fun(); // [warn]: %s
+        }
+    }c.format(MSG, MSG), sac, 1);
+
+	assertAnalyzerWarningsDMD(q{
+        int fun() { return 1; }
+        void main()
+        {
+        	while (true)
+            	fun(); // [warn]: %s
+        }
+    }c.format(MSG), sac, 1);
+
+	assertAnalyzerWarningsDMD(q{
+        int fun() { return 1; }
+        alias gun = fun;
+        void main()
+        {
+            gun(); // [warn]: %s
+        }
+    }c.format(MSG), sac, 1);
+
+	assertAnalyzerWarningsDMD(q{
+        void main()
+        {
+            void fun() {}
+            fun();
+        }
+    }c, sac, 1);
+
 	stderr.writeln("Unittest for UnusedResultChecker passed");
 }
