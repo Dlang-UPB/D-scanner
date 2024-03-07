@@ -884,10 +884,6 @@ private BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		checks ~= new AutoFunctionChecker(args.setSkipTests(
 		analysisConfig.auto_function_check == Check.skipTests && !ut));
 
-	if (moduleName.shouldRun!VcallCtorChecker(analysisConfig))
-		checks ~= new VcallCtorChecker(args.setSkipTests(
-		analysisConfig.vcall_in_ctor == Check.skipTests && !ut));
-
 	if (moduleName.shouldRun!UselessInitializerChecker(analysisConfig))
 		checks ~= new UselessInitializerChecker(args.setSkipTests(
 		analysisConfig.useless_initializer == Check.skipTests && !ut));
@@ -1345,6 +1341,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new NumberStyleCheck!ASTCodegen(
 			fileName,
 			config.number_style_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(VcallCtorChecker!ASTCodegen)(config))
+		visitors ~= new VcallCtorChecker!ASTCodegen(
+			fileName,
+			config.vcall_in_ctor == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
