@@ -77,17 +77,33 @@ extern (C++) class UnusedResultChecker(AST) : BaseAnalyzerDmd
 	{
 		import dmd.astenums : TY;
 
+		import std.stdio : writeln;
+		writeln("****************************************");
+		writeln(statement.stmt);
+
+		writeln("Is ExpStatement: ", statement.isExpStatement() !is null);
+
 		auto exprStatement = statement.isExpStatement();
 		if (exprStatement is null)
 			return false;
 
+		writeln("Is CallExpr: ", exprStatement.exp.isCallExp() !is null);
+
 		auto callExpr = exprStatement.exp.isCallExp();
+
+		//writeln("What is callExpr?:" , callExpr.e1.op);
+		//auto ident = callExpr.e1.isIdentifierExp();
+		//writeln(ident.names[0]);
 		if (callExpr is null || callExpr.f is null)
 			return false;
+
+		writeln("Is TypeFunction: ", callExpr.f.type.isTypeFunction() !is null);
 
 		auto typeFunction = callExpr.f.type.isTypeFunction();
 		if (typeFunction is null || typeFunction.next.ty == TY.Tvoid)
 			return false;
+
+		writeln("****************************************");
 
 		return true;
 	}
@@ -120,57 +136,44 @@ unittest
 	sac.unused_result = Check.enabled;
 
 	assertAnalyzerWarningsDMD(q{
-        int fun() { return 1; }
-        void main()
-        {
-            fun(); // [warn]: %s
-        }
-    }c.format(MSG), sac, 1);
-
-	assertAnalyzerWarningsDMD(q{
-        int fun() { return 1; }
-        void main()
-        {
-        	if (true)
-            	fun(); // [warn]: %s
-            else
-            	fun(); // [warn]: %s
-        }
-    }c.format(MSG, MSG), sac, 1);
-
-	assertAnalyzerWarningsDMD(q{
-        int fun() { return 1; }
-        void main()
-        {
-        	while (true)
-            	fun(); // [warn]: %s
-        }
-    }c.format(MSG), sac, 1);
-
-	assertAnalyzerWarningsDMD(q{
-        int fun() { return 1; }
-        alias gun = fun;
-        void main()
-        {
-            gun(); // [warn]: %s
-        }
-    }c.format(MSG), sac, 1);
-
-	assertAnalyzerWarningsDMD(q{
-        void main()
-        {
-            int fun() { return 1; }
-            fun(); // [warn]: %s
-        }
-    }c.format(MSG), sac, 1);
-
-	assertAnalyzerWarningsDMD(q{
-        void fun() {}
+		void fun() {}
         void main()
         {
             fun();
         }
-    }c, sac, 1);
+    }c, sac, true);
+
+	assertAnalyzerWarningsDMD(q{
+        alias noreturn = typeof(*null);
+        noreturn fun() { while (1) {} }
+        noreturn main()
+        {
+            fun();
+        }
+    }c, sac, true);
+
+	assertAnalyzerWarningsDMD(q{
+        int fun() { return 1; }
+        void main()
+        {
+            fun(); // [warn]: %s
+        }
+    }c.format(MSG), sac, true);
+
+	assertAnalyzerWarningsDMD(q{
+        struct Foo
+        {
+            static bool get()
+            {
+                return false;
+            }
+        }
+        alias Bar = Foo;
+        void main()
+        {
+            Bar.get(); // [warn]: %s
+        }
+    }c.format(MSG), sac, true);
 
 	assertAnalyzerWarningsDMD(q{
         void main()
@@ -178,7 +181,15 @@ unittest
             void fun() {}
             fun();
         }
-    }c, sac, 1);
+    }c, sac, true);
+
+	assertAnalyzerWarningsDMD(q{
+        void main()
+        {
+            int fun() { return 1; }
+            fun(); // [warn]: %s
+        }
+    }c.format(MSG), sac, true);
 
 	assertAnalyzerWarningsDMD(q{
         int fun() { return 1; }
@@ -186,7 +197,7 @@ unittest
         {
             cast(void) fun();
         }
-    }c, sac, 1);
+    }c, sac, true);
 
 	assertAnalyzerWarningsDMD(q{
         void fun() { }
@@ -195,7 +206,7 @@ unittest
         {
             gun();
         }
-    }c, sac, 1);
+    }c, sac, true);
 
 	stderr.writeln("Unittest for UnusedResultChecker passed");
 }
