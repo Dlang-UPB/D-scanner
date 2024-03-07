@@ -109,27 +109,25 @@ extern (C++) class CyclomaticComplexityCheck(AST) : BaseAnalyzerDmd
 		funcExp.fd.accept(this);
 	}
 
-	mixin VisitComplex!(AST.IfStatement, (AST.IfStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		statement.condition.accept(visitor);
-		statement.ifbody.accept(visitor);
+	mixin VisitComplex!(AST.IfStatement);
+	mixin VisitComplex!(AST.LogicalExp);
+	mixin VisitComplex!(AST.CondExp);
+	mixin VisitComplex!(AST.CaseStatement);
+	mixin VisitComplex!(AST.CaseRangeStatement);
+	mixin VisitComplex!(AST.ReturnStatement);
+	mixin VisitComplex!(AST.ContinueStatement);
+	mixin VisitComplex!(AST.GotoStatement);
+	mixin VisitComplex!(AST.TryFinallyStatement);
+	mixin VisitComplex!(AST.ThrowExp);
 
-		if (statement.elsebody !is null)
-			statement.elsebody.accept(visitor);
-	});
-
-	mixin VisitComplex!(AST.CaseStatement, (AST.CaseStatement statement, CyclomaticComplexityCheck visitor)
+	private template VisitComplex(NodeType, int increase = 1)
 	{
-		statement.exp.accept(visitor);
-		statement.statement.accept(visitor);
-	});
-
-	mixin VisitComplex!(AST.CaseRangeStatement, (AST.CaseRangeStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		statement.first.accept(visitor);
-		statement.last.accept(visitor);
-		statement.statement.accept(visitor);
-	});
+		override void visit(NodeType nodeType)
+		{
+			complexityStack[$ - 1] += increase;
+			super.visit(nodeType);
+		}
+	}
 
 	override void visit(AST.SwitchStatement switchStatement)
 	{
@@ -147,22 +145,6 @@ extern (C++) class CyclomaticComplexityCheck(AST) : BaseAnalyzerDmd
 			complexityStack[$ - 1]++;
 	}
 
-	mixin VisitComplex!(AST.ReturnStatement, (AST.ReturnStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		if (statement.exp !is null)
-			statement.exp.accept(visitor);
-	});
-
-	mixin VisitComplex!(AST.ContinueStatement, (AST.ContinueStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		return;
-	});
-
-	mixin VisitComplex!(AST.GotoStatement, (AST.GotoStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		return;
-	});
-
 	override void visit(AST.TryCatchStatement tryCatchStatement)
 	{
 		tryCatchStatement._body.accept(this);
@@ -177,57 +159,6 @@ extern (C++) class CyclomaticComplexityCheck(AST) : BaseAnalyzerDmd
 		}
 	}
 
-	mixin VisitComplex!(AST.TryFinallyStatement, (AST.TryFinallyStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		statement._body.accept(visitor);
-		statement.finalbody.accept(visitor);
-	});
-
-	mixin VisitComplex!(AST.ThrowExp, (AST.ThrowExp expression, CyclomaticComplexityCheck visitor)
-	{
-		expression.e1.accept(visitor);
-	});
-
-	mixin VisitComplex!(AST.LogicalExp, (AST.LogicalExp expression, CyclomaticComplexityCheck visitor)
-	{
-		expression.e1.accept(visitor);
-		expression.e2.accept(visitor);
-	});
-
-	mixin VisitComplex!(AST.CondExp, (AST.CondExp CondExp, CyclomaticComplexityCheck visitor)
-	{
-		CondExp.econd.accept(visitor);
-		CondExp.e1.accept(visitor);
-		CondExp.e2.accept(visitor);
-	});
-
-	mixin VisitLoop!(AST.DoStatement, (AST.DoStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		statement.condition.accept(visitor);
-		statement._body.accept(visitor);
-	});
-
-	mixin VisitLoop!(AST.WhileStatement, (AST.WhileStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		statement.condition.accept(visitor);
-		statement._body.accept(visitor);
-	});
-
-	mixin VisitLoop!(AST.ForStatement, (AST.ForStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		if (statement._init !is null)
-			statement._init.accept(visitor);
-
-		if (statement.condition !is null)
-			statement.condition.accept(visitor);
-
-		if (statement.increment !is null)
-			statement.increment.accept(visitor);
-
-		if (statement._body !is null)
-			statement._body.accept(visitor);
-	});
-
 	override void visit(AST.StaticForeachStatement staticForeachStatement)
 	{
 		// StaticForeachStatement visit has to be overridden in order to avoid visiting
@@ -235,37 +166,13 @@ extern (C++) class CyclomaticComplexityCheck(AST) : BaseAnalyzerDmd
 		return;
 	}
 
-	mixin VisitLoop!(AST.ForeachRangeStatement, (AST.ForeachRangeStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		if (statement._body !is null)
-			statement._body.accept(visitor);
+	mixin VisitLoop!(AST.DoStatement);
+	mixin VisitLoop!(AST.WhileStatement);
+	mixin VisitLoop!(AST.ForStatement);
+	mixin VisitLoop!(AST.ForeachRangeStatement);
+	mixin VisitLoop!(AST.ForeachStatement);
 
-		if (statement.lwr !is null)
-			statement.lwr.accept(visitor);
-
-		if (statement.upr !is null)
-			statement.upr.accept(visitor);
-	});
-
-	mixin VisitLoop!(AST.ForeachStatement, (AST.ForeachStatement statement, CyclomaticComplexityCheck visitor)
-	{
-		if (statement._body !is null)
-			statement._body.accept(visitor);
-
-		if (statement.aggr !is null)
-			statement.aggr.accept(visitor);
-	});
-
-	private template VisitComplex(NodeType, alias visitMembersOf, int increase = 1)
-	{
-		override void visit(NodeType nodeType)
-		{
-			complexityStack[$ - 1] += increase;
-			visitMembersOf(nodeType, this);
-		}
-	}
-
-	private template VisitLoop(NodeType, alias visitMembersOf, int increase = 1)
+	private template VisitLoop(NodeType, int increase = 1)
 	{
 		override void visit(NodeType nodeType)
 		{
@@ -274,7 +181,7 @@ extern (C++) class CyclomaticComplexityCheck(AST) : BaseAnalyzerDmd
 			inLoop.length--;
 
 			complexityStack[$ - 1] += increase;
-			visitMembersOf(nodeType, this);
+			super.visit(nodeType);
 		}
 	}
 }
