@@ -86,10 +86,11 @@ extern (C++) class UnusedResultChecker(AST) : BaseAnalyzerDmd
 			return false;
 
 		auto typeFunction = callExpr.f.type.isTypeFunction();
-		if (typeFunction is null || typeFunction.next.ty == TY.Tvoid)
+		if (typeFunction is null)
 			return false;
 
-		return true;
+		TY type = typeFunction.next.ty;
+		return type != TY.Tvoid && type != TY.Tnoreturn;
 	}
 
 	private template VisitInstructionBlock(T)
