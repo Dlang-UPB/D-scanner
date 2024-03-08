@@ -839,10 +839,6 @@ private BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		checks ~= new UnmodifiedFinder(args.setSkipTests(
 		analysisConfig.could_be_immutable_check == Check.skipTests && !ut));
 
-	if (moduleName.shouldRun!FunctionAttributeCheck(analysisConfig))
-		checks ~= new FunctionAttributeCheck(args.setSkipTests(
-		analysisConfig.function_attribute_check == Check.skipTests && !ut));
-
 	if (moduleName.shouldRun!IfElseSameCheck(analysisConfig))
 		checks ~= new IfElseSameCheck(args.setSkipTests(
 		analysisConfig.if_else_same_check == Check.skipTests&& !ut));
@@ -1345,6 +1341,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new NumberStyleCheck!ASTCodegen(
 			fileName,
 			config.number_style_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(FunctionAttributeCheck!ASTCodegen)(config))
+		visitors ~= new FunctionAttributeCheck!ASTCodegen(
+			fileName,
+			config.function_attribute_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
