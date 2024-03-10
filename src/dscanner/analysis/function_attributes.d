@@ -7,6 +7,7 @@ module dscanner.analysis.function_attributes;
 
 import dscanner.analysis.base;
 import dmd.astenums : STC, MOD, MODFlags;
+import dmd.tokens : Token, TOK;
 import std.string : format;
 
 /**
@@ -30,17 +31,60 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 	private enum RETURN_MSG = "'%s' is not an attribute of the return type. Place it after the parameter list to clarify.";
 
 	private bool inInterface = false;
+	private bool inAggregate = false;
+	private Token[] tokens;
 
 	extern (D) this(string fileName, bool skipTests = false)
 	{
 		super(fileName, skipTests);
+		getTokens();
 	}
 
-	override void visit(AST.InterfaceDeclaration id)
+	private void getTokens()
 	{
-		this.inInterface = true;
-		super.visit(id);
-		this.inInterface = false;
+		import dscanner.utils : readFile;
+		import dmd.errorsink : ErrorSinkNull;
+		import dmd.globals : global;
+		import dmd.lexer : Lexer;
+
+		auto bytes = readFile(fileName) ~ '\0';
+		__gshared ErrorSinkNull errorSinkNull;
+		if (!errorSinkNull)
+			errorSinkNull = new ErrorSinkNull;
+
+		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0, errorSinkNull, &global.compileEnv);
+		while (lexer.nextToken() != TOK.endOfFile)
+			tokens ~= lexer.token;
+	}
+
+	mixin visitAggregate!(AST.InterfaceDeclaration, true);
+	mixin visitAggregate!(AST.ClassDeclaration);
+	mixin visitAggregate!(AST.StructDeclaration);
+	mixin visitAggregate!(AST.UnionDeclaration);
+
+	private template visitAggregate(NodeType, bool isInterface = false)
+	{
+		override void visit(NodeType node)
+		{
+			immutable bool oldInAggregate = inAggregate;
+			immutable bool oldInInterface = inInterface;
+
+			inAggregate = !isStaticAggregate(node.loc.linnum, node.loc.charnum);
+			inInterface = isInterface;
+			super.visit(node);
+
+			inAggregate = oldInAggregate;
+			inInterface = oldInInterface;
+		}
+	}
+
+	private bool isStaticAggregate(uint lineNum, uint charNum)
+	{
+		import std.algorithm : any, filter;
+
+		return tokens.filter!(token => token.loc.linnum == lineNum && token.loc.charnum <= charNum)
+			.filter!(token => token.value >= TOK.struct_ && token.value <= TOK.immutable_)
+			.any!(token => token.value == TOK.static_);
 	}
 
 	override void visit(AST.FuncDeclaration fd)
@@ -50,29 +94,33 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 		if (fd.type is null)
 			return;
 
-		auto tf = fd.type.isTypeFunction();
-		if (tf is null)
-			return;
-
 		immutable ulong lineNum = cast(ulong) fd.loc.linnum;
 		immutable ulong charNum = cast(ulong) fd.loc.charnum;
-		immutable bool isAbstract = (fd.storage_class & STC.abstract_) > 0;
-		immutable bool isStatic = (fd.storage_class & STC.static_) > 0;
 
-		if (isAbstract && inInterface)
-			addErrorMessage(lineNum, charNum, KEY, ABSTRACT_MSG);
-
-		string storageTok = getConstLikeStorage(tf.mod);
-
-		if (storageTok is null)
+		if (inInterface)
 		{
-			if (!isStatic && tf.isproperty() && tf.parameterList.parameters.length == 0)
-				addErrorMessage(lineNum, charNum, KEY, CONST_MSG);
+			immutable bool isAbstract = (fd.storage_class & STC.abstract_) > 0;
+			if (isAbstract)
+				addErrorMessage(lineNum, charNum, KEY, ABSTRACT_MSG);
 		}
-		else
+
+		if (inAggregate && fd.type.isTypeFunction())
 		{
-			if (!hasConstLikeAttribute(cast(ulong) fd.loc.fileOffset))
-				addErrorMessage(lineNum, charNum, KEY, RETURN_MSG.format(storageTok));
+			auto tf = fd.type.isTypeFunction();
+			string storageTok = getConstLikeStorage(tf.mod);
+
+			if (storageTok is null)
+			{
+				immutable bool isStatic = (fd.storage_class & STC.static_) > 0;
+				immutable bool isZeroParamProperty = tf.isproperty() && tf.parameterList.parameters.length == 0;
+				if (!isStatic && isZeroParamProperty)
+					addErrorMessage(lineNum, charNum, KEY, CONST_MSG);
+			}
+			else
+			{
+				if (!hasConstLikeAttribute(cast(ulong) fd.loc.fileOffset))
+					addErrorMessage(lineNum, charNum, KEY, RETURN_MSG.format(storageTok));
+			}
 		}
 	}
 
@@ -131,7 +179,7 @@ unittest
 	sac.function_attribute_check = Check.enabled;
 
 	assertAnalyzerWarningsDMD(q{
-		// int foo() @property { return 0; }
+		int foo() @property { return 0; }
 
 		class ClassName {
 			const int confusingConst() { return 0; } // [warn]: 'const' is not an attribute of the return type. Place it after the parameter list to clarify.
@@ -157,6 +205,20 @@ unittest
 			static int barStatic() @property { return 0; }
 			int barConst() const @property;
 			abstract int method(); // [warn]: 'abstract' attribute is redundant in interface declarations
+		}
+	}c, sac);
+
+	// Test taken from phobos / utf.d, shouldn't warn
+	assertAnalyzerWarningsDMD(q{
+		static struct R
+		{
+			@safe pure @nogc nothrow:
+			this(string s) { this.s = s; }
+			@property bool empty() { return idx == s.length; }
+			@property char front() { return s[idx]; }
+			void popFront() { ++idx; }
+			size_t idx;
+			string s;
 		}
 	}c, sac);
 
