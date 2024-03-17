@@ -33,9 +33,6 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 	private enum LOGICAL_EXP_KEY = "dscanner.bugs.logic_operator_operands";
 	private enum LOGICAL_EXP_MESSAGE = "Left side of logical %s is identical to right side.";
 
-	private enum CMP_KEY = "dscanner.bugs.comparison_operator_operands";
-	private enum CMP_MESSAGE = "Left side of %s operator is identical to right side.";
-
 	private enum ASSIGN_KEY = "dscanner.bugs.self_assignment";
 	private enum ASSIGN_MESSAGE = "Left side of assignment operation is identical to the right side.";
 
@@ -63,8 +60,6 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 	}
 
 	mixin VisitBinaryExpression!(AST.LogicalExp);
-	mixin VisitBinaryExpression!(AST.EqualExp);
-	mixin VisitBinaryExpression!(AST.CmpExp);
 	mixin VisitBinaryExpression!(AST.AssignExp);
 
 	private template VisitBinaryExpression(NodeType)
@@ -94,18 +89,6 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 			return tuple(LOGICAL_EXP_KEY, LOGICAL_EXP_MESSAGE.format("or"));
 		case EXP.andAnd:
 			return tuple(LOGICAL_EXP_KEY, LOGICAL_EXP_MESSAGE.format("and"));
-		case EXP.equal:
-			return tuple(CMP_KEY, CMP_MESSAGE.format("'=='"));
-		case EXP.notEqual:
-			return tuple(CMP_KEY, CMP_MESSAGE.format("'!='"));
-		case EXP.lessThan:
-			return tuple(CMP_KEY, CMP_MESSAGE.format("'<'"));
-		case EXP.lessOrEqual:
-			return tuple(CMP_KEY, CMP_MESSAGE.format("'<='"));
-		case EXP.greaterThan:
-			return tuple(CMP_KEY, CMP_MESSAGE.format("'>'"));
-		case EXP.greaterOrEqual:
-			return tuple(CMP_KEY, CMP_MESSAGE.format("'>='"));
 		case EXP.assign:
 			return tuple(ASSIGN_KEY, ASSIGN_MESSAGE);
 		default:
@@ -141,50 +124,20 @@ unittest
 	}c, sac);
 
 	assertAnalyzerWarningsDMD(q{
-		void testLogicalExprSame()
+		void testLogicalExp()
 		{
-			int a = 1, b = 2;
-
-			if (a == 1 && b == 1) {}
-			if (a == 1 && a == 1) {} // [warn]: Left side of logical and is identical to right side.
-
-			if (a == 1 || b == 1) {}
-			if (a == 1 || a == 1) {} // [warn]: Left side of logical or is identical to right side.
+			int a = 5, b = 5;
+			if (a == b || a == b) // [warn]: Left side of logical or is identical to right side.
+				a = 6;
+			if (a == b && a == b) // [warn]: Left side of logical and is identical to right side.
+				a = 6;
 		}
 	}c, sac);
 
 	assertAnalyzerWarningsDMD(q{
-		void testCmpExprSame()
+		void testAssignExp()
 		{
-			int a = 1, b = 2;
-
-			if (a == b) {}
-			if (a == a) {} // [warn]: Left side of '==' operator is identical to right side.
-
-			if (a != b) {}
-			if (a != a) {} // [warn]: Left side of '!=' operator is identical to right side.
-
-			b = a == a ? 1 : 2; // [warn]: Left side of '==' operator is identical to right side.
-
-			if (a > b) {}
-			if (a > a) {} // [warn]: Left side of '>' operator is identical to right side.
-
-			if (a < b) {}
-			if (a < a) {} // [warn]: Left side of '<' operator is identical to right side.
-
-			if (a >= b) {}
-			if (a >= a) {} // [warn]: Left side of '>=' operator is identical to right side.
-
-			if (a <= b) {}
-			if (a <= a) {} // [warn]: Left side of '<=' operator is identical to right side.
-		}
-	}c, sac);
-
-	assertAnalyzerWarningsDMD(q{
-		void testAssignSame()
-		{
-			int a = 1;
-			a = 5;
+			int a = 5;
 			a = a; // [warn]: Left side of assignment operation is identical to the right side.
 		}
 	}c, sac);
