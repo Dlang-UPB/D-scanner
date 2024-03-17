@@ -36,6 +36,8 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 	private enum ASSIGN_KEY = "dscanner.bugs.self_assignment";
 	private enum ASSIGN_MESSAGE = "Left side of assignment operation is identical to the right side.";
 
+	private bool inAssignment = false;
+
 	extern (D) this(string fileName, bool skipTests = false)
 	{
 		super(fileName, skipTests);
@@ -59,25 +61,38 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 		}
 	}
 
-	mixin VisitBinaryExpression!(AST.LogicalExp);
-	mixin VisitBinaryExpression!(AST.CondExp);
-
-	private template VisitBinaryExpression(NodeType)
+	override void visit(AST.AssignExp assignExp)
 	{
-		override void visit(NodeType node)
+		bool oldInAssignment = inAssignment;
+		inAssignment = true;
+		super.visit(assignExp);
+		inAssignment = oldInAssignment;
+	}
+
+	override void visit(AST.CondExp condExp)
+	{
+		super.visit(condExp);
+		if (inAssignment)
+			handleBinaryExpression(condExp);
+	}
+
+	override void visit(AST.LogicalExp logicalExpr)
+	{
+		super.visit(logicalExpr);
+		handleBinaryExpression(logicalExpr);
+	}
+
+	private void handleBinaryExpression(AST.BinExp expr)
+	{
+		auto expr1 = to!string(toChars(expr.e1));
+		auto expr2 = to!string(toChars(expr.e2));
+
+		if (expr1 == expr2)
 		{
-			super.visit(node);
-
-			auto expr1 = to!string(toChars(node.e1));
-			auto expr2 = to!string(toChars(node.e2));
-
-			if (expr1 == expr2)
-			{
-				auto lineNum = cast(ulong) node.loc.linnum;
-				auto charNum = cast(ulong) node.loc.charnum;
-				auto errorInfo = getErrorInfo(node.op);
-				addErrorMessage(lineNum, charNum, errorInfo[0], errorInfo[1]);
-			}
+			auto lineNum = cast(ulong) expr.loc.linnum;
+			auto charNum = cast(ulong) expr.loc.charnum;
+			auto errorInfo = getErrorInfo(expr.op);
+			addErrorMessage(lineNum, charNum, errorInfo[0], errorInfo[1]);
 		}
 	}
 
@@ -138,7 +153,7 @@ unittest
 		void testAssignExp()
 		{
 			int a = 5, b = 5;
-			a =  b > 5 ? b : b; // [warn]: Left side of assignment operation is identical to the right side.
+			a = b > 5 ? b : b; // [warn]: Left side of assignment operation is identical to the right side.
 		}
 	}c, sac);
 
