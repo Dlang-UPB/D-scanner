@@ -60,7 +60,7 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 	}
 
 	mixin VisitBinaryExpression!(AST.LogicalExp);
-	mixin VisitBinaryExpression!(AST.AssignExp);
+	mixin VisitBinaryExpression!(AST.CondExp);
 
 	private template VisitBinaryExpression(NodeType)
 	{
@@ -89,7 +89,7 @@ extern (C++) class IfElseSameCheck(AST) : BaseAnalyzerDmd
 			return tuple(LOGICAL_EXP_KEY, LOGICAL_EXP_MESSAGE.format("or"));
 		case EXP.andAnd:
 			return tuple(LOGICAL_EXP_KEY, LOGICAL_EXP_MESSAGE.format("and"));
-		case EXP.assign:
+		case EXP.question:
 			return tuple(ASSIGN_KEY, ASSIGN_MESSAGE);
 		default:
 			assert(0);
@@ -137,8 +137,8 @@ unittest
 	assertAnalyzerWarningsDMD(q{
 		void testAssignExp()
 		{
-			int a = 5;
-			a = a; // [warn]: Left side of assignment operation is identical to the right side.
+			int a = 5, b = 5;
+			a =  b > 5 ? b : b; // [warn]: Left side of assignment operation is identical to the right side.
 		}
 	}c, sac);
 
