@@ -133,7 +133,7 @@ extern (C++) class CyclomaticComplexityCheck(AST) : BaseAnalyzerDmd
 	{
 		inLoop.assumeSafeAppend ~= false;
 		scope (exit)
-		inLoop.length--;
+			inLoop.length--;
 
 		switchStatement.condition.accept(this);
 		switchStatement._body.accept(this);
@@ -178,7 +178,7 @@ extern (C++) class CyclomaticComplexityCheck(AST) : BaseAnalyzerDmd
 		{
 			inLoop.assumeSafeAppend ~= true;
 			scope (exit)
-			inLoop.length--;
+				inLoop.length--;
 
 			complexityStack[$ - 1] += increase;
 			super.visit(nodeType);
@@ -196,14 +196,97 @@ unittest
 	sac.cyclomatic_complexity = Check.enabled;
 	sac.max_cyclomatic_complexity = 0;
 
+	// TODO: Remove redundant tests and break down remaining tests in individual assertions
 	assertAnalyzerWarningsDMD(q{
-		// unit test
-		unittest // [warn]: Cyclomatic complexity of this function is 1.
-		{
-			writeln("hello");
-			writeln("world");
-		}
-	}c, sac);
+unittest // [warn]: Cyclomatic complexity of this function is 1.
+{
+}
+
+// unit test
+unittest // [warn]: Cyclomatic complexity of this function is 1.
+{
+	writeln("hello");
+	writeln("world");
+}
+
+void main(string[] args) // [warn]: Cyclomatic complexity of this function is 3.
+{
+	if (!args.length)
+		return;
+	writeln("hello ", args);
+}
+
+unittest // [warn]: Cyclomatic complexity of this function is 1.
+{
+	// static if / static foreach does not increase cyclomatic complexity
+	static if (stuff)
+		int a;
+	int a;
+}
+
+unittest // [warn]: Cyclomatic complexity of this function is 2.
+{
+	foreach (i; 0 .. 2)
+	{
+	}
+	int a;
+}
+
+unittest // [warn]: Cyclomatic complexity of this function is 3.
+{
+	foreach (i; 0 .. 2)
+	{
+		break;
+	}
+	int a;
+}
+
+unittest // [warn]: Cyclomatic complexity of this function is 2.
+{
+	switch (x)
+	{
+	case 1:
+		break;
+	default:
+		break;
+	}
+	int a;
+}
+
+// Template, other (tested) stuff
+bool shouldRun(check : BaseAnalyzer)( // [warn]: Cyclomatic complexity of this function is 20.
+	string moduleName, const ref StaticAnalysisConfig config)
+{
+	enum string a = check.name;
+
+	if (mixin("config." ~ a) == Check.disabled)
+		return false;
+
+	// By default, run the check
+	if (!moduleName.length)
+		return true;
+
+	auto filters = mixin("config.filters." ~ a);
+
+	// Check if there are filters are defined
+	// filters starting with a comma are invalid
+	if (filters.length == 0 || filters[0].length == 0)
+		return true;
+
+	auto includers = filters.filter!(f => f[0] == '+').map!(f => f[1..$]);
+	auto excluders = filters.filter!(f => f[0] == '-').map!(f => f[1..$]);
+
+	// exclusion has preference over inclusion
+	if (!excluders.empty && excluders.any!(s => moduleName.canFind(s)))
+		return false;
+
+	if (!includers.empty)
+		return includers.any!(s => moduleName.canFind(s));
+
+	// by default: include all modules
+	return true;
+}
+}c, sac);
 
 	assertAnalyzerWarningsDMD(q{
 		// goto, return
@@ -352,37 +435,6 @@ unittest
 			{
 				x = 9;
 			}
-		}
-	}c, sac);
-
-	assertAnalyzerWarningsDMD(q{
-		// Template, other (tested) stuff
-		bool shouldRun(check : BaseAnalyzer)( // [warn]: Cyclomatic complexity of this function is 20.
-			string moduleName, const ref StaticAnalysisConfig config)
-		{
-			enum string a = check.name;
-
-			if (mixin("config." ~ a) == Check.disabled)
-				return false;
-
-			if (!moduleName.length)
-				return true;
-
-			auto filters = mixin("config.filters." ~ a);
-
-			if (filters.length == 0 || filters[0].length == 0)
-				return true;
-
-			auto includers = filters.filter!(f => f[0] == '+').map!(f => f[1..$]);
-			auto excluders = filters.filter!(f => f[0] == '-').map!(f => f[1..$]);
-
-			if (!excluders.empty && excluders.any!(s => moduleName.canFind(s)))
-				return false;
-
-			if (!includers.empty)
-				return includers.any!(s => moduleName.canFind(s));
-
-			return true;
 		}
 	}c, sac);
 
