@@ -17,7 +17,6 @@ extern (C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd
 	alias visit = BaseAnalyzerDmd.visit;
 
 	mixin ScopedVisit!(AST.Module);
-	mixin ScopedVisit!(AST.TemplateDeclaration);
 	mixin ScopedVisit!(AST.IfStatement);
 	mixin ScopedVisit!(AST.WithStatement);
 	mixin ScopedVisit!(AST.WhileStatement);
@@ -27,13 +26,15 @@ extern (C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd
 	mixin ScopedVisit!(AST.ForeachStatement);
 	mixin ScopedVisit!(AST.ForeachRangeStatement);
 	mixin ScopedVisit!(AST.ScopeStatement);
-	mixin ScopedVisit!(AST.UnitTestDeclaration);
-	mixin ScopedVisit!(AST.FuncDeclaration);
-	mixin ScopedVisit!(AST.FuncLiteralDeclaration);
 	mixin ScopedVisit!(AST.FuncAliasDeclaration);
 	mixin ScopedVisit!(AST.CtorDeclaration);
 	mixin ScopedVisit!(AST.DtorDeclaration);
 	mixin ScopedVisit!(AST.InvariantDeclaration);
+
+	mixin FunctionVisit!(AST.FuncDeclaration);
+	mixin FunctionVisit!(AST.TemplateDeclaration);
+	mixin FunctionVisit!(AST.UnitTestDeclaration);
+	mixin FunctionVisit!(AST.FuncLiteralDeclaration);
 
 	mixin AggregateVisit!(AST.ClassDeclaration);
 	mixin AggregateVisit!(AST.StructDeclaration);
@@ -49,7 +50,7 @@ extern (C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd
 	{
 		import dmd.astenums : STC;
 
-		if (!(vd.storage_class & STC.scope_))
+		if (!(vd.storage_class & STC.scope_) && !isInLocalFunction)
 		{
 			auto thing = Thing(to!string(vd.ident.toChars()), vd.loc.linnum, vd.loc.charnum);
 			duplicateCheck(thing, false, conditionalDepth > 0);
@@ -68,6 +69,7 @@ extern (C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd
 	override void visit(AST.ConditionalDeclaration conditionalDeclaration)
 	{
 		import dmd.root.array : peekSlice;
+
 		conditionalDeclaration.condition.accept(this);
 
 		if (conditionalDeclaration.condition.isVersionCondition())
@@ -83,7 +85,7 @@ extern (C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd
 			popScope();
 
 		if (conditionalDeclaration.elsedecl)
-			foreach(decl; conditionalDeclaration.elsedecl.peekSlice())
+			foreach (decl; conditionalDeclaration.elsedecl.peekSlice())
 				decl.accept(this);
 
 		if (conditionalDeclaration.condition.isVersionCondition())
@@ -134,6 +136,34 @@ extern (C++) class LabelVarNameCheck(AST) : BaseAnalyzerDmd
 
 private:
 	extern (D) Thing[string][] stack;
+	int conditionalDepth;
+	extern (D) Thing[] parentAggregates;
+	extern (D) string parentAggregateText;
+	bool isInFunction;
+	bool isInLocalFunction;
+	enum string KEY = "dscanner.suspicious.label_var_same_name";
+
+	template FunctionVisit(NodeType)
+	{
+		override void visit(NodeType n)
+		{
+			auto oldIsInFunction = isInFunction;
+			auto oldIsInLocalFunction = isInLocalFunction;
+
+			pushScope();
+
+			if (isInFunction)
+				isInLocalFunction = true;
+			else
+				isInFunction = true;
+
+			super.visit(n);
+			popScope();
+
+			isInFunction = oldIsInFunction;
+			isInLocalFunction = oldIsInLocalFunction;
+		}
+	}
 
 	template AggregateVisit(NodeType)
 	{
@@ -167,14 +197,16 @@ private:
 			string fqn = parentAggregateText ~ id.name;
 			const(Thing)* thing = fqn in s;
 			if (thing is null)
+			{
 				currentScope[fqn] = Thing(fqn, id.line, id.column, !fromLabel);
+			}
 			else if (i != 0 || !isConditional)
 			{
 				immutable thisKind = fromLabel ? "Label" : "Variable";
 				immutable otherKind = thing.isVar ? "variable" : "label";
 				auto msg = thisKind ~ " \"" ~ fqn ~ "\" has the same name as a "
 					~ otherKind ~ " defined on line " ~ to!string(thing.line) ~ ".";
-				addErrorMessage(id.line, id.column, "dscanner.suspicious.label_var_same_name", msg);
+				addErrorMessage(id.line, id.column, KEY, msg);
 			}
 			++i;
 		}
@@ -203,8 +235,6 @@ private:
 		stack.length--;
 	}
 
-	int conditionalDepth;
-
 	extern (D) void pushAggregateName(string name, size_t line, size_t column)
 	{
 		parentAggregates ~= Thing(name, line, column);
@@ -227,9 +257,6 @@ private:
 		else
 			parentAggregateText = "";
 	}
-
-	extern (D) Thing[] parentAggregates;
-	extern (D) string parentAggregateText;
 }
 
 unittest
@@ -240,6 +267,7 @@ unittest
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.label_var_same_name_check = Check.enabled;
+
 	assertAnalyzerWarningsDMD(q{
 unittest
 {
@@ -353,7 +381,6 @@ unittest
 		break;
 	}
 }
-
 }c, sac);
 	stderr.writeln("Unittest for LabelVarNameCheck passed.");
 }
