@@ -11,6 +11,7 @@ import std.conv : to;
 import std.format : format;
 import std.regex;
 
+// TODO: Fix NoLint
 extern (C++) class StyleChecker(AST) : BaseAnalyzerDmd
 {
 	mixin AnalyzerInfo!"style_check";
