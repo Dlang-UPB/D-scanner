@@ -144,7 +144,14 @@ extern (C++) class UnusedParameterCheck(AST) : BaseAnalyzerDmd
 
 	private void pushScope()
 	{
-		usedParams ~= new ParamSet;
+		// Error with gdc-12
+		//usedParams ~= new ParamSet;
+
+		// Workaround for gdc-12
+		ParamSet newScope;
+		newScope["test"] = ParamInfo("test", 0, 0);
+		usedParams ~= newScope;
+		currentScope.remove("test");
 	}
 
 	private void popScope()
