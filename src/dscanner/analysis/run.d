@@ -841,10 +841,6 @@ private BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		checks ~= new MismatchedArgumentCheck(args.setSkipTests(
 		analysisConfig.mismatched_args_check == Check.skipTests && !ut));
 
-	if (moduleName.shouldRun!UndocumentedDeclarationCheck(analysisConfig))
-		checks ~= new UndocumentedDeclarationCheck(args.setSkipTests(
-		analysisConfig.undocumented_declaration_check == Check.skipTests && !ut));
-
 	if (moduleName.shouldRun!UnusedVariableCheck(analysisConfig))
 		checks ~= new UnusedVariableCheck(args.setSkipTests(
 		analysisConfig.unused_variable_check == Check.skipTests && !ut));
@@ -1348,6 +1344,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new AutoFunctionChecker!ASTCodegen(
 			fileName,
 			config.auto_function_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(UndocumentedDeclarationCheck!ASTCodegen)(config))
+		visitors ~= new UndocumentedDeclarationCheck!ASTCodegen(
+			fileName,
+			config.undocumented_declaration_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
