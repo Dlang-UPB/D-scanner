@@ -317,6 +317,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 			fileName,
 			config.vcall_in_ctor == Check.skipTests && !ut
 		);
+	
+	if (moduleName.shouldRunDmd!AllManCheck(config))
+		visitors ~= new AllManCheck(
+			fileName,
+			config.allman_braces_check == Check.skipTests && !ut
+		);
 
 	foreach (visitor; visitors)
 	{
