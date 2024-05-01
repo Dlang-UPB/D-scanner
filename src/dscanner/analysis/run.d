@@ -849,10 +849,6 @@ private BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		checks ~= new AllManCheck(args.setSkipTests(
 		analysisConfig.allman_braces_check == Check.skipTests && !ut));
 
-	if (moduleName.shouldRun!IfConstraintsIndentCheck(analysisConfig))
-		checks ~= new IfConstraintsIndentCheck(args.setSkipTests(
-		analysisConfig.if_constraints_indent == Check.skipTests && !ut));
-
 	if (moduleName.shouldRun!UnusedResultChecker(analysisConfig))
 		checks ~= new UnusedResultChecker(args.setSkipTests(
 		analysisConfig.unused_result == Check.skipTests && !ut));
@@ -1362,6 +1358,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 			fileName,
 			config.long_line_check == Check.skipTests && !ut,
 			config.max_line_length
+		);
+
+	if (moduleName.shouldRunDmd!(IfConstraintsIndentCheck!ASTCodegen)(config))
+		visitors ~= new IfConstraintsIndentCheck!ASTCodegen(
+			fileName,
+			config.if_constraints_indent == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
