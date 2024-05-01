@@ -4,194 +4,204 @@
 
 module dscanner.analysis.if_constraints_indent;
 
-import dparse.lexer;
-import dparse.ast;
 import dscanner.analysis.base;
-import dsymbol.scope_ : Scope;
-
-import std.algorithm.iteration : filter;
-import std.range;
+import dmd.tokens : Token, TOK;
+import std.typecons : Tuple, tuple;
 
 /**
 Checks whether all if constraints have the same indention as their declaration.
 */
-final class IfConstraintsIndentCheck : BaseAnalyzer
+extern (C++) class IfConstraintsIndentCheck(AST) : BaseAnalyzerDmd
 {
+	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"if_constraints_indent";
 
-	///
-	this(BaseAnalyzerArguments args)
+	private enum string KEY = "dscanner.style.if_constraints_indent";
+	private enum string MSG = "If constraints should have the same indentation as the function";
+
+	private Token[] tokens;
+	alias FileOffset = uint;
+	private uint[FileOffset] tokenIndexes;
+
+	extern (D) this(string fileName, bool skipTests = false)
 	{
-		super(args);
+		super(fileName, skipTests);
+		lexFile();
+	}
 
-		// convert tokens to a list of token starting positions per line
+	private void lexFile()
+	{
+		import dscanner.utils : readFile;
+		import dmd.errorsink : ErrorSinkNull;
+		import dmd.globals : global;
+		import dmd.lexer : Lexer;
 
-		// libdparse columns start at 1
-		foreach (t; tokens)
+		auto bytes = readFile(fileName) ~ '\0';
+
+		__gshared ErrorSinkNull errorSinkNull;
+		if (!errorSinkNull)
+			errorSinkNull = new ErrorSinkNull;
+
+		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0,  errorSinkNull, &global.compileEnv);
+
+		do
 		{
-			// pad empty positions if we skip empty token-less lines
-			// t.line (unsigned) may be 0 if the token is uninitialized/broken, so don't subtract from it
-			// equivalent to: firstSymbolAtLine.length < t.line - 1
-			while (firstSymbolAtLine.length + 1 < t.line)
-				firstSymbolAtLine ~= Pos(1, t.index);
-
-			// insert a new line with positions if new line is reached
-			// (previous while pads skipped lines)
-			if (firstSymbolAtLine.length < t.line)
-				firstSymbolAtLine ~= Pos(t.column, t.index, t.type == tok!"if");
+			lexer.nextToken();
+			tokens ~= lexer.token;
+			tokenIndexes[lexer.token.loc.fileOffset] = cast(uint) tokens.length - 1;
 		}
+		while (lexer.token.value != TOK.endOfFile);
 	}
 
-	override void visit(const FunctionDeclaration decl)
+	override void visit(AST.TemplateDeclaration templateDecl)
 	{
-		if (decl.constraint !is null)
-			checkConstraintSpace(decl.constraint, decl.name);
+		import std.algorithm : filter;
+		import std.range : front, retro;
+
+		super.visit(templateDecl);
+
+		if (templateDecl.constraint is null || templateDecl.members is null)
+			return;
+
+		auto firstMember = (*(templateDecl.members))[0];
+		uint templateLine = templateDecl.loc.linnum;
+		uint templateCol = templateDecl.loc.charnum;
+
+		auto templateTokenIdx = tokenIndexes[templateDecl.loc.fileOffset];
+		if (tokens[templateTokenIdx].value != TOK.template_)
+		{
+			if (auto func = firstMember.isFuncDeclaration())
+			{
+				auto loc = computeFunctionTemplateLoc(func);
+				templateLine = loc[0];
+				templateCol = loc[1];
+			}
+			else
+			{
+				templateLine = firstMember.loc.linnum;
+				templateCol = firstMember.loc.charnum;
+			}
+		}
+
+		int constraintIdx = tokenIndexes[templateDecl.constraint.loc.fileOffset];
+		auto constraintToken = tokens[0 .. constraintIdx].retro.filter!(t => t.value == TOK.if_).front;
+		uint constraintLine = constraintToken.loc.linnum;
+		uint constraintCol = constraintToken.loc.charnum;
+
+		if (templateLine == constraintLine || templateCol != constraintCol)
+			addErrorMessage(cast(ulong) constraintLine, cast(ulong) constraintCol, KEY, MSG);
 	}
 
-	override void visit(const InterfaceDeclaration decl)
+	private Tuple!(uint, uint) computeFunctionTemplateLoc(AST.FuncDeclaration func)
 	{
-		if (decl.constraint !is null)
-			checkConstraintSpace(decl.constraint, decl.name);
-	}
+		import std.algorithm : canFind;
+		import std.conv : to;
 
+		if (auto typeFunc = func.type.isTypeFunction())
+		{
+			if (auto type = typeFunc.next.isTypeInstance())
+			{
+				return tuple(type.loc.linnum, type.loc.charnum);
+			}
+			else if (to!string(typeFunc.next.kind()).canFind("array"))
+			{
+				auto idx = tokenIndexes[func.loc.fileOffset] - 1;
+				while (tokens[idx].value == TOK.rightBracket)
+				{
+					while (tokens[idx].value != TOK.leftBracket)
+						idx--;
 
-	override void visit(const ClassDeclaration decl)
-	{
-		if (decl.constraint !is null)
-			checkConstraintSpace(decl.constraint, decl.name);
-	}
+					idx--;
+				}
 
-	override void visit(const TemplateDeclaration decl)
-	{
-		if (decl.constraint !is null)
-			checkConstraintSpace(decl.constraint, decl.name);
-	}
+				auto token = tokens[idx];
+				return tuple(token.loc.linnum, token.loc.charnum);
+			}
+		}
 
-	override void visit(const UnionDeclaration decl)
-	{
-		if (decl.constraint !is null)
-			checkConstraintSpace(decl.constraint, decl.name);
-	}
-
-	override void visit(const StructDeclaration decl)
-	{
-		if (decl.constraint !is null)
-			checkConstraintSpace(decl.constraint, decl.name);
-	}
-
-	override void visit(const Constructor decl)
-	{
-		if (decl.constraint !is null)
-			checkConstraintSpace(decl.constraint, decl.line);
-	}
-
-	alias visit = ASTVisitor.visit;
-
-private:
-
-	enum string KEY = "dscanner.style.if_constraints_indent";
-	enum string MESSAGE = "If constraints should have the same indentation as the function";
-
-	Pos[] firstSymbolAtLine;
-	static struct Pos
-	{
-		size_t column;
-		size_t index;
-		bool isIf;
-	}
-
-	/**
-	Check indentation of constraints
-	*/
-	void checkConstraintSpace(const Constraint constraint, const Token token)
-	{
-		checkConstraintSpace(constraint, token.line);
-	}
-
-	void checkConstraintSpace(const Constraint constraint, size_t line)
-	{
-		import std.algorithm : min;
-
-		// dscanner lines start at 1
-		auto pDecl = firstSymbolAtLine[line - 1];
-
-		// search for constraint if (might not be on the same line as the expression)
-		auto r = firstSymbolAtLine[line .. constraint.expression.line].retro.filter!(s => s.isIf);
-
-		auto if_ = constraint.tokens.findTokenForDisplay(tok!"if")[0];
-
-		// no hit = constraint is on the same line
-		if (r.empty)
-			addErrorMessage(if_, KEY, MESSAGE);
-		else if (pDecl.column != r.front.column)
-			addErrorMessage([min(if_.index, pDecl.index), if_.index + 2], if_.line, [min(if_.column, pDecl.column), if_.column + 2], KEY, MESSAGE);
+		auto idx = tokenIndexes[func.loc.fileOffset] - 1;
+		auto token = tokens[idx];
+		return tuple(token.loc.linnum, token.loc.charnum);
 	}
 }
 
 unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarnings;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
 	import std.format : format;
 	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.if_constraints_indent = Check.enabled;
+	enum MSG = "If constraints should have the same indentation as the function";
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
+char[digestLength!(Hash)*2] hexDigest(Hash, Order order = Order.increasing, T...)(scope const T data)
+if (allSatisfy!(isArray, typeof(data)))
+{
+    return toHexString!order(digest!Hash(data));
+}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+ElementType!(A) pop (A) (ref A a)
+if (isDynamicArray!(A) && !isNarrowString!(A) && isMutable!(A) && !is(A == void[]))
+{
+    auto e = a.back;
+    a.popBack();
+    return e;
+}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+	template HMAC(H)
+	if (isDigest!H && hasBlockSize!H)
+	{
+	    alias HMAC = HMAC!(H, H.blockSize);
+	}
+	}, sac);
+
+	assertAnalyzerWarningsDMD(q{
 void foo(R)(R r)
 if (R == null)
 {}
 
-// note: since we are using tabs, the ^ look a bit off here. Use 1-wide tab stops to view tests.
 void foo(R)(R r)
-	if (R == null) /+
-^^^ [warn]: %s +/
+	if (R == null) // [warn]: %s
 {}
-	}c.format(
-		IfConstraintsIndentCheck.MESSAGE,
-	), sac);
+	}c.format(MSG), sac);
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 	void foo(R)(R r)
 	if (R == null)
 	{}
 
 	void foo(R)(R r)
-if (R == null) /+
-^^ [warn]: %s +/
+if (R == null) // [warn]: %s
 	{}
 
 	void foo(R)(R r)
-		if (R == null) /+
-	^^^ [warn]: %s +/
+		if (R == null) // [warn]: %s
 	{}
-	}c.format(
-		IfConstraintsIndentCheck.MESSAGE,
-		IfConstraintsIndentCheck.MESSAGE,
-	), sac);
+	}c.format(MSG, MSG), sac);
 
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 	struct Foo(R)
 	if (R == null)
 	{}
 
 	struct Foo(R)
-if (R == null) /+
-^^ [warn]: %s +/
+if (R == null) // [warn]: %s
 	{}
 
 	struct Foo(R)
-		if (R == null) /+
-	^^^ [warn]: %s +/
+		if (R == null) // [warn]: %s
 	{}
-	}c.format(
-		IfConstraintsIndentCheck.MESSAGE,
-		IfConstraintsIndentCheck.MESSAGE,
-	), sac);
+	}c.format(MSG, MSG), sac);
 
 	// test example from Phobos
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 Num abs(Num)(Num x) @safe pure nothrow
 if (is(typeof(Num.init >= 0)) && is(typeof(-Num.init)) &&
 	!(is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
@@ -205,7 +215,7 @@ if (is(typeof(Num.init >= 0)) && is(typeof(-Num.init)) &&
 	}, sac);
 
 	// weird constraint formatting
-	assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
 	struct Foo(R)
 	if
 	(R == null)
@@ -217,8 +227,7 @@ if (is(typeof(Num.init >= 0)) && is(typeof(-Num.init)) &&
 	{}
 
 	struct Foo(R)
-if /+
-^^ [warn]: %s +/
+if // [warn]: %s
 	(R == null)
 	{}
 
@@ -234,23 +243,16 @@ if /+
 	{}
 
 	struct Foo(R)
-		if ( /+
-	^^^ [warn]: %s +/
+		if ( // [warn]: %s
 		R == null
 	) {}
-	}c.format(
-		IfConstraintsIndentCheck.MESSAGE,
-		IfConstraintsIndentCheck.MESSAGE,
-	), sac);
+	}c.format(MSG, MSG), sac);
 
 	// constraint on the same line
-	assertAnalyzerWarnings(q{
-	struct CRC(uint N, ulong P) if (N == 32 || N == 64) /+
-	                            ^^ [warn]: %s +/
+	assertAnalyzerWarningsDMD(q{
+	struct CRC(uint N, ulong P) if (N == 32 || N == 64) // [warn]: %s
 	{}
-	}c.format(
-		IfConstraintsIndentCheck.MESSAGE,
-	), sac);
+	}c.format(MSG), sac);
 
 	stderr.writeln("Unittest for IfConstraintsIndentCheck passed.");
 }
@@ -259,14 +261,13 @@ if /+
 unittest
 {
 	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarnings;
-	import std.format : format;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
 	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.if_constraints_indent = Check.enabled;
 
-    assertAnalyzerWarnings(`void foo() {
-    f;
+	assertAnalyzerWarningsDMD(`void foo() {
+	''
 }`, sac);
 }
