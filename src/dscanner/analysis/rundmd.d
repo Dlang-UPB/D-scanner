@@ -25,6 +25,7 @@ import dscanner.analysis.enumarrayliteral : EnumArrayVisitor;
 import dscanner.analysis.explicitly_annotated_unittests : ExplicitlyAnnotatedUnittestCheck;
 import dscanner.analysis.final_attribute : FinalAttributeChecker;
 import dscanner.analysis.has_public_example : HasPublicExampleCheck;
+import dscanner.analysis.if_constraints_indent : IfConstraintsIndentCheck;
 import dscanner.analysis.ifelsesame : IfElseSameCheck;
 import dscanner.analysis.imports_sortedness : ImportSortednessCheck;
 import dscanner.analysis.incorrect_infinite_range : IncorrectInfiniteRangeCheck;
@@ -323,6 +324,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new AllManCheck(
 			fileName,
 			config.allman_braces_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(IfConstraintsIndentCheck!ASTCodegen)(config))
+		visitors ~= new IfConstraintsIndentCheck!ASTCodegen(
+			fileName,
+			config.if_constraints_indent == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
