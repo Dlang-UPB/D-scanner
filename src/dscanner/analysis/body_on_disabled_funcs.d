@@ -37,8 +37,7 @@ extern (C++) class BodyOnDisabledFuncsCheck(AST) : BaseAnalyzerDmd
 	{
 		override void visit(NodeType node)
 		{
-			bool isCurrentDisabled = isDisabled || (node.storage_class & STC.disable) != 0;
-			if (isCurrentDisabled)
+			if (isDisabled || (node.storage_class & STC.disable) != 0)
 				return;
 
 			bool wasDisabled = isDisabled;
@@ -56,8 +55,7 @@ extern (C++) class BodyOnDisabledFuncsCheck(AST) : BaseAnalyzerDmd
 	{
 		override void visit(NodeType node)
 		{
-			bool isCurrentDisabled = isDisabled || (node.storage_class & STC.disable) != 0;
-			if (isCurrentDisabled && node.fbody !is null)
+			if ((isDisabled || (node.storage_class & STC.disable) != 0) && node.fbody !is null)
 				addErrorMessage(cast(ulong) node.loc.linnum, cast(ulong) node.loc.charnum, KEY, MSG);
 		}
 	}
