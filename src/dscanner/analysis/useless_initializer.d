@@ -97,31 +97,31 @@ extern (C++) class UselessInitializerChecker(AST) : BaseAnalyzerDmd
 		visitedStructs[structName].shouldErrorOnInit = !isDisabled;
 	}
 
-	override void visit(AST.VarDeclaration varDeclaration)
+	override void visit(AST.VarDeclaration varDecl)
 	{
 		import std.format : format;
 
-		super.visit(varDeclaration);
+		super.visit(varDecl);
 
-		// issue 474, manifest constants HAVE to be initialized
-		// initializer has to appear clearly in generated ddoc
-		if (varDeclaration._init is null || varDeclaration.storage_class & STC.manifest || varDeclaration.comment())
+		// issue 474, manifest constants HAVE to be initialized initializer has to appear clearly in generated ddoc
+		// https://github.com/dlang-community/d-Scanner/issues/474
+		if (varDecl._init is null || varDecl.storage_class & STC.manifest || varDecl.comment())
 			return;
 
-		ulong lineNum = cast(ulong) varDeclaration.loc.linnum;
-		ulong charNum = cast(ulong) varDeclaration.loc.charnum;
-		string msg = MSG.format(varDeclaration.ident.toString());
+		ulong lineNum = cast(ulong) varDecl.loc.linnum;
+		ulong charNum = cast(ulong) varDecl.loc.charnum;
+		string msg = MSG.format(varDecl.ident.toString());
 
-		if (auto expInit = varDeclaration._init.isExpInitializer())
+		if (auto expInit = varDecl._init.isExpInitializer())
 		{
 			bool isBasicType;
-			if (varDeclaration.type)
-				isBasicType = isBasicTypeConstant(varDeclaration.type.ty);
+			if (varDecl.type)
+				isBasicType = isBasicTypeConstant(varDecl.type.ty);
 
 			if (isRedundantExpInit(expInit.exp, isBasicType))
 				addErrorMessage(lineNum, charNum, KEY, msg);
 		}
-		else if (auto arrInit = varDeclaration._init.isArrayInitializer())
+		else if (auto arrInit = varDecl._init.isArrayInitializer())
 		{
 			if (arrInit.dim == 0 && arrInit.index.length == 0 && arrInit.value.length == 0)
 				addErrorMessage(lineNum, charNum, KEY, msg);
@@ -197,11 +197,13 @@ extern (C++) class UselessInitializerChecker(AST) : BaseAnalyzerDmd
 	}
 
 	// issue 473, prevent to visit delegates that contain duck type checkers.
+	// https://github.com/dlang-community/d-Scanner/issues/473
 	override void visit(AST.TypeTypeof _)
 	{
 	}
 
 	// issue 473, prevent to check expressions in __traits(compiles, ...)
+	// https://github.com/dlang-community/d-Scanner/issues/473
 	override void visit(AST.TraitsExp traitsExp)
 	{
 		if (traitsExp.ident.toString() != "compiles")
