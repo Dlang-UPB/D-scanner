@@ -22,7 +22,7 @@ extern (C++) class LineLengthCheck : BaseAnalyzerDmd
 	private uint currentLine = 1;
 	private int currentLineLen;
 
-	extern (D) this(string fileName, bool skipTests = false, int maxLineLength)
+	extern (D) this(string fileName, bool skipTests = false, int maxLineLength = 120)
 	{
 		import std.conv : to;
 
