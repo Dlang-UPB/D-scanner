@@ -71,7 +71,9 @@ extern (C++) class LineLengthCheck : BaseAnalyzerDmd
 				case '\t':
 					currentLineLen += 4;
 					break;
-				case '\n', '\v', '\r':
+				case '\r':
+					break;
+				case '\n', '\v':
 					checkCurrentLineLength();
 					break;
 				default:
@@ -102,7 +104,7 @@ extern (C++) class LineLengthCheck : BaseAnalyzerDmd
 		import std.utf : byDchar;
 
 		foreach (dchar c; commentStr.byDchar)
-			if (c == '\n' || c == '\v' || c == '\r')
+			if (c == '\n' || c == '\v')
 				checkCurrentLineLength();
 	}
 
@@ -114,9 +116,9 @@ extern (C++) class LineLengthCheck : BaseAnalyzerDmd
 		{
 			if (c == '\t')
 				currentLineLen += 4;
-			else if (c == '\n' || c == '\v' || c == '\r')
+			else if (c == '\n' || c == '\v')
 				checkCurrentLineLength();
-			else
+			else if (c != '\r')
 				currentLineLen++;
 		}
 	}
