@@ -20,12 +20,82 @@ extern (C++) class UnusedResultChecker(AST) : BaseAnalyzerDmd
 {
 	alias visit = BaseAnalyzerDmd.visit;
 	mixin AnalyzerInfo!"unused_result";
+
 	private enum KEY = "dscanner.performance.enum_array_literal";
 	private enum string MSG = "Function return value is discarded";
+
+	private bool[string] nonVoidFuncs;
+	private string[] aggregateStack;
 
 	extern (D) this(string fileName, bool skipTests = false)
 	{
 		super(fileName, skipTests);
+	}
+
+	private template VisitAggregate(NodeType)
+	{
+		override void visit(NodeType aggregate)
+		{
+			string name = cast(string) aggregate.ident.toString();
+			aggregateStack ~= name;
+			super.visit(aggregate);
+			aggregateStack.length -= 1;
+		}
+	}
+
+	mixin VisitAggregate!(AST.StructDeclaration);
+	mixin VisitAggregate!(AST.ClassDeclaration);
+
+	override void visit(AST.FuncDeclaration funcDeclaration)
+	{
+		import dmd.astenums : TY;
+
+		auto typeFunc = funcDeclaration.type.isTypeFunction();
+		if (typeFunc && typeFunc.next && typeFunc.next.ty != TY.Tvoid && typeFunc.next.ty != TY.Tnoreturn)
+		{
+			auto typeIdent = typeFunc.next.isTypeIdentifier();
+			bool isNoReturn = typeIdent is null ? false : typeIdent.ident.toString() == "noreturn";
+
+			if (!isNoReturn)
+			{
+				string funcName = buildFullyQualifiedName(cast(string) funcDeclaration.ident.toString());
+				nonVoidFuncs[funcName] = true;
+			}
+		}
+
+		super.visit(funcDeclaration);
+	}
+
+	override void visit(AST.AliasDeclaration aliasDecl)
+	{
+		import std.algorithm : canFind, endsWith;
+		import std.array : replace;
+
+		auto typeIdent = aliasDecl.type.isTypeIdentifier();
+		if (typeIdent is null)
+			return;
+
+		string aliasName = cast(string) aliasDecl.ident.toString();
+		string targetName = cast(string) typeIdent.ident.toString();
+
+		foreach(func; nonVoidFuncs.byKey())
+		{
+			if (func.endsWith(targetName) || func.canFind(targetName ~ "."))
+			{
+				string newAliasName = func.replace(targetName, aliasName);
+				nonVoidFuncs[newAliasName] = true;
+			}
+		}
+	}
+
+	private extern (D) string buildFullyQualifiedName(string funcName)
+	{
+		import std.algorithm : fold;
+
+		if (aggregateStack.length == 0)
+			return funcName;
+
+		return aggregateStack.fold!((a, b) => a ~ "." ~ b) ~ "." ~ funcName;
 	}
 
 	mixin VisitInstructionBlock!(AST.WhileStatement);
@@ -73,29 +143,9 @@ extern (C++) class UnusedResultChecker(AST) : BaseAnalyzerDmd
 		super.visit(ifStatement);
 	}
 
-	private bool hasUnusedResult(AST.Statement statement)
+	private template VisitInstructionBlock(NodeType)
 	{
-		import dmd.astenums : TY;
-
-		auto exprStatement = statement.isExpStatement();
-		if (exprStatement is null)
-			return false;
-
-		auto callExpr = exprStatement.exp.isCallExp();
-		if (callExpr is null || callExpr.f is null)
-			return false;
-
-		auto typeFunction = callExpr.f.type.isTypeFunction();
-		if (typeFunction is null)
-			return false;
-
-		TY type = typeFunction.next.ty;
-		return type != TY.Tvoid && type != TY.Tnoreturn;
-	}
-
-	private template VisitInstructionBlock(T)
-	{
-		override void visit(T statement)
+		override void visit(NodeType statement)
 		{
 			if (hasUnusedResult(statement._body))
 			{
@@ -106,6 +156,49 @@ extern (C++) class UnusedResultChecker(AST) : BaseAnalyzerDmd
 
 			super.visit(statement);
 		}
+	}
+
+	private bool hasUnusedResult(AST.Statement statement)
+	{
+		import dmd.astenums : TY;
+
+		auto exprStatement = statement.isExpStatement();
+		if (exprStatement is null)
+			return false;
+
+		auto callExpr = exprStatement.exp.isCallExp();
+		if (callExpr is null)
+			return false;
+
+		string funcName = "";
+
+		if (auto identExpr = callExpr.e1.isIdentifierExp())
+			funcName = cast(string) identExpr.ident.toString();
+		else if (auto dotIdExpr = callExpr.e1.isDotIdExp())
+			funcName = buildFullyQualifiedCallName(dotIdExpr);
+
+		return (funcName in nonVoidFuncs) !is null;
+	}
+
+	private extern (D) string buildFullyQualifiedCallName(AST.DotIdExp dotIdExpr)
+	{
+		import std.algorithm : fold, reverse;
+
+		string[] nameStack;
+		nameStack ~= cast(string) dotIdExpr.ident.toString();
+
+		auto lastExpr = dotIdExpr.e1;
+		while (lastExpr.isDotIdExp())
+		{
+			auto current = lastExpr.isDotIdExp();
+			nameStack ~= cast(string) current.ident.toString();
+			lastExpr = current.e1;
+		}
+
+		if (auto identExpr = lastExpr.isIdentifierExp())
+			nameStack ~= cast(string) identExpr.ident.toString();
+
+		return nameStack.reverse.fold!((a, b) => a ~ "." ~ b);
 	}
 }
 
@@ -126,7 +219,7 @@ unittest
         {
             fun();
         }
-    }c, sac, true);
+    }c, sac);
 
 	assertAnalyzerWarningsDMD(q{
         alias noreturn = typeof(*null);
@@ -135,7 +228,7 @@ unittest
         {
             fun();
         }
-    }c, sac, true);
+    }c, sac);
 
 	assertAnalyzerWarningsDMD(q{
         int fun() { return 1; }
@@ -143,7 +236,7 @@ unittest
         {
             fun(); // [warn]: %s
         }
-    }c.format(MSG), sac, true);
+    }c.format(MSG), sac);
 
 	assertAnalyzerWarningsDMD(q{
         struct Foo
@@ -157,8 +250,9 @@ unittest
         void main()
         {
             Bar.get(); // [warn]: %s
+            Foo.bar.get();
         }
-    }c.format(MSG), sac, true);
+    }c.format(MSG), sac);
 
 	assertAnalyzerWarningsDMD(q{
         void main()
@@ -166,7 +260,7 @@ unittest
             void fun() {}
             fun();
         }
-    }c, sac, true);
+    }c, sac);
 
 	assertAnalyzerWarningsDMD(q{
         void main()
@@ -174,7 +268,7 @@ unittest
             int fun() { return 1; }
             fun(); // [warn]: %s
         }
-    }c.format(MSG), sac, true);
+    }c.format(MSG), sac);
 
 	assertAnalyzerWarningsDMD(q{
         int fun() { return 1; }
@@ -182,7 +276,7 @@ unittest
         {
             cast(void) fun();
         }
-    }c, sac, true);
+    }c, sac);
 
 	assertAnalyzerWarningsDMD(q{
         void fun() { }
@@ -191,7 +285,7 @@ unittest
         {
             gun();
         }
-    }c, sac, true);
+    }c, sac);
 
 	assertAnalyzerWarningsDMD(q{
         int fun() { return 1; }
@@ -202,7 +296,7 @@ unittest
             else
             	fun(); // [warn]: %s
         }
-    }c.format(MSG, MSG), sac, true);
+    }c.format(MSG, MSG), sac);
 
 	assertAnalyzerWarningsDMD(q{
         int fun() { return 1; }
@@ -211,7 +305,7 @@ unittest
         	while (true)
             	fun(); // [warn]: %s
         }
-    }c.format(MSG), sac, true);
+    }c.format(MSG), sac);
 
 	assertAnalyzerWarningsDMD(q{
         int fun() { return 1; }
@@ -220,7 +314,7 @@ unittest
         {
             gun(); // [warn]: %s
         }
-    }c.format(MSG), sac, true);
+    }c.format(MSG), sac);
 
 	assertAnalyzerWarningsDMD(q{
         void main()
@@ -228,7 +322,7 @@ unittest
             void fun() {}
             fun();
         }
-    }c, sac, true);
+    }c, sac);
 
 	stderr.writeln("Unittest for UnusedResultChecker passed");
 }
