@@ -8,6 +8,9 @@ import dscanner.analysis.base;
 import dmd.tokens : Token, TOK;
 import std.typecons : Tuple, tuple;
 
+// TODO: remove
+import std.stdio : writeln;
+
 /**
 Checks whether all if constraints have the same indention as their declaration.
 */
@@ -97,7 +100,8 @@ extern (C++) class IfConstraintsIndentCheck(AST) : BaseAnalyzerDmd
 		import std.algorithm : canFind;
 		import std.conv : to;
 
-		if (auto typeFunc = func.type.isTypeFunction())
+		auto typeFunc = func.type.isTypeFunction();
+		if (typeFunc && typeFunc.next)
 		{
 			if (auto type = typeFunc.next.isTypeInstance())
 			{
@@ -137,10 +141,13 @@ unittest
 	enum MSG = "If constraints should have the same indentation as the function";
 
 	assertAnalyzerWarningsDMD(q{
-char[digestLength!(Hash)*2] hexDigest(Hash, Order order = Order.increasing, T...)(scope const T data)
-if (allSatisfy!(isArray, typeof(data)))
+void test(alias matchFn)()
 {
-    return toHexString!order(digest!Hash(data));
+	auto baz(Cap)(Cap m)
+	if (is(Cap == Captures!(Cap.String)))
+	{
+	    return toUpper(m.hit);
+	}
 }
 	}c, sac);
 
@@ -268,6 +275,6 @@ unittest
 	sac.if_constraints_indent = Check.enabled;
 
 	assertAnalyzerWarningsDMD(`void foo() {
-	''
+	f();
 }`, sac);
 }
