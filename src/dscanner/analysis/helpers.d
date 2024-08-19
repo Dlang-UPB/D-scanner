@@ -400,7 +400,7 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config, b
         remove(testFileName);
 	}
 
-	f.write(code);
+	//f.write(code);
 	f.close();
 
 	auto dmdModule = parseDmdModule(file, code);
