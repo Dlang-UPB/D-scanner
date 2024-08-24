@@ -5,10 +5,7 @@
 module dscanner.analysis.vcall_in_ctor;
 
 import dscanner.analysis.base;
-import dscanner.utils;
-import dparse.ast, dparse.lexer;
-import std.algorithm.searching : canFind;
-import std.range: retro;
+import dmd.astenums : STC;
 
 /**
  * Checks virtual calls from the constructor to methods defined in the same class.
@@ -16,337 +13,225 @@ import std.range: retro;
  * When not used carefully, virtual calls from constructors can lead to a call
  * in a derived instance that's not yet constructed.
  */
-final class VcallCtorChecker : BaseAnalyzer
+extern (C++) class VcallCtorChecker(AST) : BaseAnalyzerDmd
 {
-    alias visit = BaseAnalyzer.visit;
+	alias visit = BaseAnalyzerDmd.visit;
+	mixin AnalyzerInfo!"vcall_in_ctor";
 
-    mixin AnalyzerInfo!"vcall_in_ctor";
+	private enum string KEY = "dscanner.vcall_ctor";
+	private enum string MSG = "a virtual call inside a constructor may lead to unexpected results in the derived classes";
 
-private:
+	private static struct FuncContext
+	{
+		bool canBeVirtual;
+		bool hasNonVirtualVis;
+		bool hasNonVirtualStg;
+		bool inCtor;
+	}
 
-    enum string KEY = "dscanner.vcall_ctor";
-    enum string MSG = "a virtual call inside a constructor may lead to"
-        ~ " unexpected results in the derived classes";
+	private static struct CallContext
+	{
+		string funcName;
+		ulong lineNum;
+		ulong charNum;
+	}
 
-    // what's called in the ctor
-    Token[][] _ctorCalls;
-    // the virtual method in the classes
-    Token[][] _virtualMethods;
+	private FuncContext[] contexts;
+	private bool[string] virtualFuncs;
+	private CallContext[] ctorCalls;
+	private bool isFinal;
 
+	extern (D) this(string filename, bool skipTests = false)
+	{
+		super(filename, skipTests);
+	}
 
-    // The problem only happens in classes
-    bool[] _inClass = [false];
-    // The problem only happens in __ctor
-    bool[] _inCtor = [false];
-    // The problem only happens with call to virtual methods
-    bool[] _isVirtual = [true];
-    // The problem only happens with call to virtual methods
-    bool[] _isNestedFun = [false];
-    // The problem only happens in derived classes that override
-    bool[] _isFinal = [false];
+	override void visit(AST.ClassDeclaration classDecl)
+	{
+		pushContext((classDecl.storage_class & STC.final_) == 0 && !isFinal);
+		super.visit(classDecl);
+		checkForVirtualCalls();
+		popContext();
+	}
 
-    void pushVirtual(bool value)
-    {
-        _isVirtual ~= value;
-    }
+	override void visit(AST.StructDeclaration structDecl)
+	{
+		pushContext(false);
+		super.visit(structDecl);
+		checkForVirtualCalls();
+		popContext();
+	}
 
-    void pushInClass(bool value)
-    {
-        _inClass ~= value;
-        _ctorCalls.length += 1;
-        _virtualMethods.length += 1;
-    }
+	private void checkForVirtualCalls()
+	{
+		import std.algorithm : each, filter;
 
-    void pushInCtor(bool value)
-    {
-        _inCtor ~= value;
-    }
+		ctorCalls.filter!(call => call.funcName in virtualFuncs)
+			.each!(call => addErrorMessage(call.lineNum, call.charNum, KEY, MSG));
+	}
 
-    void pushNestedFunc(bool value)
-    {
-        _isNestedFun ~= value;
-    }
+	override void visit(AST.VisibilityDeclaration visDecl)
+	{
+		import dmd.dsymbol : Visibility;
 
-    void pushIsFinal(bool value)
-    {
-        _isFinal ~= value;
-    }
+		if (contexts.length == 0)
+		{
+			super.visit(visDecl);
+			return;
+		}
 
-    void popVirtual()
-    {
-        _isVirtual.length -= 1;
-    }
+		bool oldVis = currentContext.hasNonVirtualVis;
+		currentContext.hasNonVirtualVis = visDecl.visibility.kind == Visibility.Kind.private_
+			|| visDecl.visibility.kind == Visibility.Kind.package_;
+		super.visit(visDecl);
+		currentContext.hasNonVirtualVis = oldVis;
+	}
 
-    void popInClass()
-    {
-        _inClass.length -= 1;
-        _ctorCalls.length -= 1;
-        _virtualMethods.length -= 1;
-    }
+	override void visit(AST.StorageClassDeclaration stgDecl)
+	{
+		bool oldFinal = isFinal;
+		isFinal = (stgDecl.stc & STC.final_) != 0;
 
-    void popInCtor()
-    {
-        _inCtor.length -= 1;
-    }
+		bool oldStg;
+		if (contexts.length > 0)
+		{
+			oldStg = currentContext.hasNonVirtualStg;
+			currentContext.hasNonVirtualStg = !(stgDecl.stc & STC.static_ || stgDecl.stc & STC.final_);
+		}
 
-    void popNestedFunc()
-    {
-        _isNestedFun.length -= 1;
-    }
+		super.visit(stgDecl);
 
-    void popIsFinal()
-    {
-        _isFinal.length -= 1;
-    }
+		isFinal = oldFinal;
+		if (contexts.length > 0)
+			currentContext.hasNonVirtualStg = oldStg;
+	}
 
-    void overwriteVirtual(bool value)
-    {
-        _isVirtual[$-1] = value;
-    }
+	override void visit(AST.FuncDeclaration funcDecl)
+	{
+		if (contexts.length == 0)
+		{
+			super.visit(funcDecl);
+			return;
+		}
 
-    bool isVirtual()
-    {
-        return _isVirtual[$-1];
-    }
+		bool hasVirtualBody;
+		if (funcDecl.fbody !is null)
+		{
+			auto funcBody = funcDecl.fbody.isCompoundStatement();
+			hasVirtualBody = funcBody !is null && funcBody.statements !is null && (*funcBody.statements).length == 0;
+		}
+		else
+		{
+			hasVirtualBody = true;
+		}
 
-    bool isInClass()
-    {
-        return _inClass[$-1];
-    }
+		bool hasNonVirtualStg = currentContext.hasNonVirtualStg
+			|| funcDecl.storage_class & STC.static_ || funcDecl.storage_class & STC.final_;
 
-    bool isInCtor()
-    {
-        return _inCtor[$-1];
-    }
+		if (!currentContext.canBeVirtual || currentContext.hasNonVirtualVis || hasNonVirtualStg || !hasVirtualBody)
+		{
+			super.visit(funcDecl);
+			return;
+		}
 
-    bool isFinal()
-    {
-        return _isFinal[$-1];
-    }
+		string funcName = cast(string) funcDecl.ident.toString();
+		virtualFuncs[funcName] = true;
+	}
 
-    bool isInNestedFunc()
-    {
-        return _isNestedFun[$-1];
-    }
+	override void visit(AST.CtorDeclaration ctorDecl)
+	{
+		if (contexts.length == 0)
+		{
+			super.visit(ctorDecl);
+			return;
+		}
 
-    void check()
-    {
-        foreach (call; _ctorCalls[$-1])
-            foreach (vm; _virtualMethods[$-1])
-        {
-            if (call == vm)
-            {
-                addErrorMessage(call, KEY, MSG);
-                break;
-            }
-        }
-    }
+		currentContext.inCtor = true;
+		super.visit(ctorDecl);
+		currentContext.inCtor = false;
+	}
 
-public:
+	override void visit(AST.CallExp callExp)
+	{
+		super.visit(callExp);
 
-    ///
-    this(BaseAnalyzerArguments args)
-    {
-        super(args);
-    }
+		if (contexts.length == 0)
+			return;
 
-    override void visit(const(ClassDeclaration) decl)
-    {
-        pushVirtual(true);
-        pushInClass(true);
-        pushNestedFunc(false);
-        decl.accept(this);
-        check();
-        popVirtual();
-        popInClass();
-        popNestedFunc();
-    }
+		auto identExp = callExp.e1.isIdentifierExp();
+		if (!currentContext.inCtor || identExp is null)
+			return;
 
-    override void visit(const(StructDeclaration) decl)
-    {
-        pushVirtual(false);
-        pushInClass(false);
-        pushNestedFunc(false);
-        decl.accept(this);
-        check();
-        popVirtual();
-        popInClass();
-        popNestedFunc();
-    }
+		string funcCall = cast(string) identExp.ident.toString();
+		ctorCalls ~= CallContext(funcCall, callExp.loc.linnum, callExp.loc.charnum);
+	}
 
-    override void visit(const(Constructor) ctor)
-    {
-        pushInCtor(isInClass);
-        ctor.accept(this);
-        popInCtor();
-    }
+	private ref currentContext() @property
+	{
+		return contexts[$ - 1];
+	}
 
-    override void visit(const(Declaration) d)
-    {
-        // "<protection>:"
-        if (d.attributeDeclaration && d.attributeDeclaration.attribute)
-        {
-            const tp = d.attributeDeclaration.attribute.attribute.type;
-            overwriteVirtual(isProtection(tp) & (tp != tok!"private"));
-        }
+	private void pushContext(bool inClass)
+	{
+		contexts ~= FuncContext(inClass);
+	}
 
-        // "protection {}"
-        bool pop;
-        scope(exit) if (pop)
-            popVirtual;
-
-        const bool hasAttribs = d.attributes !is null;
-        const bool hasStatic = hasAttribs ? d.attributes.canFind!(a => a.attribute.type == tok!"static") : false;
-        const bool hasFinal = hasAttribs ? d.attributes.canFind!(a => a.attribute.type == tok!"final") : false;
-
-        if (d.attributes) foreach (attr; d.attributes.retro)
-        {
-            if (!hasStatic &&
-               (attr.attribute == tok!"public" || attr.attribute == tok!"protected"))
-            {
-                pushVirtual(true);
-                pop = true;
-                break;
-            }
-            else if (hasStatic || attr.attribute == tok!"private" || attr.attribute == tok!"package")
-            {
-                pushVirtual(false);
-                pop = true;
-                break;
-            }
-        }
-
-        // final class... final function
-        if ((d.classDeclaration || d.functionDeclaration) && hasFinal)
-            pushIsFinal(true);
-
-        d.accept(this);
-
-        if ((d.classDeclaration || d.functionDeclaration) && hasFinal)
-            popIsFinal;
-    }
-
-    override void visit(const(FunctionCallExpression) exp)
-    {
-        // nested function are not virtual
-        pushNestedFunc(true);
-        exp.accept(this);
-        popNestedFunc();
-    }
-
-    override void visit(const(UnaryExpression) exp)
-    {
-        if (isInCtor)
-        // get function identifier for a call, only for this member (so no ident chain)
-        if (const IdentifierOrTemplateInstance iot = safeAccess(exp)
-            .functionCallExpression.unaryExpression.primaryExpression.identifierOrTemplateInstance)
-        {
-            const Token t = iot.identifier;
-            if (t != tok!"")
-            {
-                _ctorCalls[$-1] ~= t;
-            }
-        }
-        exp.accept(this);
-    }
-
-    override void visit(const(FunctionDeclaration) d)
-    {
-        if (isInClass() && !isInNestedFunc() && !isFinal() && !d.templateParameters)
-        {
-            bool virtualOnce;
-            bool notVirtualOnce;
-
-            const bool hasAttribs = d.attributes !is null;
-            const bool hasStatic = hasAttribs ? d.attributes.canFind!(a => a.attribute.type == tok!"static") : false;
-
-            // handle "private", "public"... for this declaration
-            if (d.attributes) foreach (attr; d.attributes.retro)
-            {
-                if (!hasStatic &&
-                   (attr.attribute == tok!"public" || attr.attribute == tok!"protected"))
-                {
-                    if (!isVirtual)
-                    {
-                        virtualOnce = true;
-                        break;
-                    }
-                }
-                else if (hasStatic || attr.attribute == tok!"private" || attr.attribute == tok!"package")
-                {
-                    if (isVirtual)
-                    {
-                        notVirtualOnce = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!isVirtual && virtualOnce)
-                _virtualMethods[$-1] ~= d.name;
-            else if (isVirtual && !virtualOnce)
-                _virtualMethods[$-1] ~= d.name;
-
-        }
-        d.accept(this);
-    }
+	private void popContext()
+	{
+		contexts.length--;
+	}
 }
 
 unittest
 {
-    import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-    import dscanner.analysis.helpers : assertAnalyzerWarnings;
-    import std.stdio : stderr;
-    import std.format : format;
+	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
+	import std.format : format;
+	import std.stdio : stderr;
 
-    StaticAnalysisConfig sac = disabledConfig();
-    sac.vcall_in_ctor = Check.enabled;
+	StaticAnalysisConfig sac = disabledConfig();
+	sac.vcall_in_ctor = Check.enabled;
+	string MSG = "a virtual call inside a constructor may lead to unexpected results in the derived classes";
 
-    // fails
-    assertAnalyzerWarnings(q{
+	// fails
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
-            this(){foo();} /+
-                   ^^^ [warn]: %s +/
+            this(){foo();} // [warn]: %s
             private:
-            public
-            void foo(){}
-
+            public void foo(){}
         }
-    }c.format(VcallCtorChecker.MSG), sac);
+    }c.format(MSG), sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this()
             {
-                foo(); /+
-                ^^^ [warn]: %s +/
-                foo(); /+
-                ^^^ [warn]: %s +/
+                foo(); // [warn]: %s
+                foo(); // [warn]: %s
                 bar();
             }
             private: void bar();
             public{void foo(){}}
         }
-    }c.format(VcallCtorChecker.MSG, VcallCtorChecker.MSG), sac);
+    }c.format(MSG, MSG), sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this()
             {
                 foo();
-                bar(); /+
-                ^^^ [warn]: %s +/
+                bar(); // [warn]: %s
             }
             private: public void bar();
             public private {void foo(){}}
         }
-    }c.format(VcallCtorChecker.MSG), sac);
+    }c.format(MSG), sac);
 
-    // passes
-    assertAnalyzerWarnings(q{
+	// passes
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -354,7 +239,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -362,7 +247,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -370,7 +255,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -378,7 +263,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -386,7 +271,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         final class Bar
         {
             public:
@@ -395,7 +280,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Bar
         {
             public:
@@ -404,7 +289,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Foo
         {
             static void nonVirtual();
@@ -412,7 +297,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class Foo
         {
             package void nonVirtual();
@@ -420,7 +305,7 @@ unittest
         }
     }, sac);
 
-    assertAnalyzerWarnings(q{
+	assertAnalyzerWarningsDMD(q{
         class C {
             static struct S {
             public:
@@ -432,7 +317,5 @@ unittest
         }
     }, sac);
 
-    import std.stdio: writeln;
-    writeln("Unittest for VcallCtorChecker passed");
+	stderr.writeln("Unittest for VcallCtorChecker passed");
 }
-
