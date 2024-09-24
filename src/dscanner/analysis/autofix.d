@@ -16,7 +16,7 @@ import dscanner.analysis.config : StaticAnalysisConfig;
 import dscanner.analysis.run : analyze, doNothing;
 import dscanner.utils : readFile, readStdin;
 
-void resolveAutoFixes(
+private void resolveAutoFixes(
 	ref Message message,
 	string fileName,
 	ref ModuleCache moduleCache,
@@ -30,7 +30,7 @@ void resolveAutoFixes(
 		tokens, m, analysisConfig, overrideFormattingConfig);
 }
 
-void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, string fileName,
+private void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, string fileName,
 	ref ModuleCache moduleCache,
 	scope const(Token)[] tokens, const Module m,
 	const StaticAnalysisConfig analysisConfig,
@@ -77,6 +77,7 @@ void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, string fileN
 	~ " to resolve autofix with.");
 }
 
+///
 void resolveAutoFixFromCheck(
 	ref AutoFix autofix,
 	BaseAnalyzer check,
@@ -95,7 +96,7 @@ void resolveAutoFixFromCheck(
 	);
 }
 
-AutoFix.CodeReplacement[] resolveAutoFix(string messageCheckName, AutoFix.ResolveContext context,
+private AutoFix.CodeReplacement[] resolveAutoFix(string messageCheckName, AutoFix.ResolveContext context,
 	string fileName,
 	ref ModuleCache moduleCache,
 	scope const(Token)[] tokens, const Module m,
@@ -109,6 +110,7 @@ AutoFix.CodeReplacement[] resolveAutoFix(string messageCheckName, AutoFix.Resolv
 	return temp.expectReplacements("resolving didn't work?!");
 }
 
+///
 void listAutofixes(
 	StaticAnalysisConfig config,
 	string resolveMessage,

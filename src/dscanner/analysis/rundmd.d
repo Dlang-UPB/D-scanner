@@ -299,7 +299,7 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
  *
  * If no includes are specified, all modules are included.
 */
-bool shouldRunDmd(check : BaseAnalyzerDmd)(const char[] moduleName, const ref StaticAnalysisConfig config)
+private bool shouldRunDmd(check : BaseAnalyzerDmd)(const char[] moduleName, const ref StaticAnalysisConfig config)
 {
 	enum string a = check.name;
 
