@@ -391,39 +391,21 @@ void generateSonarQubeGenericIssueDataReport(string[] fileNames, const StaticAna
 bool analyze(string[] fileNames, const StaticAnalysisConfig config, string errorFormat,
 		ref StringCache cache, ref ModuleCache moduleCache, bool staticAnalyze = true)
 {
-	import dmd.parse : Parser;
-	import dmd.astbase : ASTBase;
-	import dmd.id : Id;
-	import dmd.globals : global;
-	import dmd.identifier : Identifier;
 	import std.string : toStringz;
-	import dmd.arraytypes : Strings;
+	import dscanner.analysis.rundmd : parseDmdModule;
 
 	import dscanner.analysis.rundmd : analyzeDmd;
 
 	bool hasErrors;
 	foreach (fileName; fileNames)
 	{
-
-		auto dmdParentDir = dirName(dirName(dirName(dirName(__FILE_FULL_PATH__))));
-
-		global.params.useUnitTests = true;
-		global.path = Strings();
-		global.path.push((dmdParentDir ~ "/dmd" ~ "\0").ptr);
-		global.path.push((dmdParentDir ~ "/dmd/druntime/src" ~ "\0").ptr);
-
-		initDMD();
-
 		auto code = readFile(fileName);
-		auto input = cast(char[]) code;
-		input ~= '\0';
-
-		auto t = dmd.frontend.parseModule(cast(const(char)[]) fileName, cast(const (char)[]) input);
-		// t.module_.fullSemantic();
-
 		// Skip files that could not be read and continue with the rest
 		if (code.length == 0)
 			continue;
+
+		auto dmdModule = parseDmdModule(fileName, cast(string) code);
+
 		RollbackAllocator r;
 		uint errorCount;
 		uint warningCount;
@@ -434,7 +416,7 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (errorCount > 0 || (staticAnalyze && warningCount > 0))
 			hasErrors = true;
 		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, staticAnalyze);
-		MessageSet resultsDmd = analyzeDmd(fileName, t.module_, getModuleName(t.module_.md), config);
+		MessageSet resultsDmd = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 		foreach (result; resultsDmd[])
 		{
 			results.insert(result);

@@ -4,6 +4,8 @@ import std.algorithm : any, canFind, filter, map;
 import std.conv : to;
 
 import dmd.astcodegen;
+import dmd.dmodule : Module;
+import dmd.frontend;
 
 import dscanner.analysis.config : Check, StaticAnalysisConfig;
 import dscanner.analysis.base : BaseAnalyzerDmd, MessageSet;
@@ -56,6 +58,34 @@ version (unittest)
 	enum ut = true;
 else
 	enum ut = false;
+
+Module parseDmdModule(string fileName, string sourceCode)
+{
+	setupDmd();
+
+	auto code = sourceCode;
+	if (code[$ - 1] != '\0')
+		code ~= '\0';
+
+	auto dmdModule = dmd.frontend.parseModule(cast(const(char)[]) fileName, cast(const (char)[]) code);
+	return dmdModule.module_;
+}
+
+private void setupDmd()
+{
+	import std.path : dirName;
+	import dmd.arraytypes : Strings;
+	import dmd.globals : global;
+
+	auto dmdParentDir = dirName(dirName(dirName(dirName(__FILE_FULL_PATH__))));
+	auto dmdDirPath = dmdParentDir ~ "/dmd" ~ "\0";
+	auto druntimeDirPath = dmdParentDir ~ "/dmd/druntime/src" ~ "\0";
+	global.params.useUnitTests = true;
+	global.path = Strings();
+	global.path.push(dmdDirPath.ptr);
+	global.path.push(druntimeDirPath.ptr);
+	initDMD();
+}
 
 MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleName, const StaticAnalysisConfig config)
 {
