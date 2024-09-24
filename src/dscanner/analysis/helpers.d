@@ -369,6 +369,8 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config, b
 	import std.stdio : File;
 	import std.file : exists, remove;
 
+	import dscanner.analysis.rundmd : analyzeDmd;
+
 	auto deleteme = "test.txt";
 	File f = File(deleteme, "w");
 	scope(exit)
