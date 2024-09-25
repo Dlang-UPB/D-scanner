@@ -238,6 +238,7 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 		string file = __FILE__, size_t line = __LINE__)
 {
 	import dparse.lexer : StringCache, Token;
+	import dscanner.analysis.autofix : improveAutoFixWhitespace;
 	import dscanner.analysis.run : parseModule;
 	import std.algorithm : canFind, findSplit, map, sort;
 	import std.conv : to;
