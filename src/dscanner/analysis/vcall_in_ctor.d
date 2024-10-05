@@ -15,186 +15,186 @@ import dmd.astenums : STC;
  */
 extern (C++) class VcallCtorChecker(AST) : BaseAnalyzerDmd
 {
-	alias visit = BaseAnalyzerDmd.visit;
-	mixin AnalyzerInfo!"vcall_in_ctor";
+    alias visit = BaseAnalyzerDmd.visit;
+    mixin AnalyzerInfo!"vcall_in_ctor";
 
-	private enum string KEY = "dscanner.vcall_ctor";
-	private enum string MSG = "a virtual call inside a constructor may lead to unexpected results in the derived classes";
+    private enum string KEY = "dscanner.vcall_ctor";
+    private enum string MSG = "a virtual call inside a constructor may lead to unexpected results in the derived classes";
 
-	private static struct FuncContext
-	{
-		bool canBeVirtual;
-		bool hasNonVirtualVis;
-		bool hasNonVirtualStg;
-		bool inCtor;
-	}
+    private static struct FuncContext
+    {
+        bool canBeVirtual;
+        bool hasNonVirtualVis;
+        bool hasNonVirtualStg;
+        bool inCtor;
+    }
 
-	private static struct CallContext
-	{
-		string funcName;
-		ulong lineNum;
-		ulong charNum;
-	}
+    private static struct CallContext
+    {
+        string funcName;
+        ulong lineNum;
+        ulong charNum;
+    }
 
-	private FuncContext[] contexts;
-	private bool[string] virtualFuncs;
-	private CallContext[] ctorCalls;
-	private bool isFinal;
+    private FuncContext[] contexts;
+    private bool[string] virtualFuncs;
+    private CallContext[] ctorCalls;
+    private bool isFinal;
 
-	extern (D) this(string filename, bool skipTests = false)
-	{
-		super(filename, skipTests);
-	}
+    extern (D) this(string filename, bool skipTests = false)
+    {
+        super(filename, skipTests);
+    }
 
-	override void visit(AST.ClassDeclaration classDecl)
-	{
-		pushContext((classDecl.storage_class & STC.final_) == 0 && !isFinal);
-		super.visit(classDecl);
-		checkForVirtualCalls();
-		popContext();
-	}
+    override void visit(AST.ClassDeclaration classDecl)
+    {
+        pushContext((classDecl.storage_class & STC.final_) == 0 && !isFinal);
+        super.visit(classDecl);
+        checkForVirtualCalls();
+        popContext();
+    }
 
-	override void visit(AST.StructDeclaration structDecl)
-	{
-		pushContext(false);
-		super.visit(structDecl);
-		checkForVirtualCalls();
-		popContext();
-	}
+    override void visit(AST.StructDeclaration structDecl)
+    {
+        pushContext(false);
+        super.visit(structDecl);
+        checkForVirtualCalls();
+        popContext();
+    }
 
-	private void checkForVirtualCalls()
-	{
-		import std.algorithm : each, filter;
+    private void checkForVirtualCalls()
+    {
+        import std.algorithm : each, filter;
 
-		ctorCalls.filter!(call => call.funcName in virtualFuncs)
-			.each!(call => addErrorMessage(call.lineNum, call.charNum, KEY, MSG));
-	}
+        ctorCalls.filter!(call => call.funcName in virtualFuncs)
+            .each!(call => addErrorMessage(call.lineNum, call.charNum, KEY, MSG));
+    }
 
-	override void visit(AST.VisibilityDeclaration visDecl)
-	{
-		import dmd.dsymbol : Visibility;
+    override void visit(AST.VisibilityDeclaration visDecl)
+    {
+        import dmd.dsymbol : Visibility;
 
-		if (contexts.length == 0)
-		{
-			super.visit(visDecl);
-			return;
-		}
+        if (contexts.length == 0)
+        {
+            super.visit(visDecl);
+            return;
+        }
 
-		bool oldVis = currentContext.hasNonVirtualVis;
-		currentContext.hasNonVirtualVis = visDecl.visibility.kind == Visibility.Kind.private_
-			|| visDecl.visibility.kind == Visibility.Kind.package_;
-		super.visit(visDecl);
-		currentContext.hasNonVirtualVis = oldVis;
-	}
+        bool oldVis = currentContext.hasNonVirtualVis;
+        currentContext.hasNonVirtualVis = visDecl.visibility.kind == Visibility.Kind.private_
+            || visDecl.visibility.kind == Visibility.Kind.package_;
+        super.visit(visDecl);
+        currentContext.hasNonVirtualVis = oldVis;
+    }
 
-	override void visit(AST.StorageClassDeclaration stgDecl)
-	{
-		bool oldFinal = isFinal;
-		isFinal = (stgDecl.stc & STC.final_) != 0;
+    override void visit(AST.StorageClassDeclaration stgDecl)
+    {
+        bool oldFinal = isFinal;
+        isFinal = (stgDecl.stc & STC.final_) != 0;
 
-		bool oldStg;
-		if (contexts.length > 0)
-		{
-			oldStg = currentContext.hasNonVirtualStg;
-			currentContext.hasNonVirtualStg = !(stgDecl.stc & STC.static_ || stgDecl.stc & STC.final_);
-		}
+        bool oldStg;
+        if (contexts.length > 0)
+        {
+            oldStg = currentContext.hasNonVirtualStg;
+            currentContext.hasNonVirtualStg = !(stgDecl.stc & STC.static_ || stgDecl.stc & STC.final_);
+        }
 
-		super.visit(stgDecl);
+        super.visit(stgDecl);
 
-		isFinal = oldFinal;
-		if (contexts.length > 0)
-			currentContext.hasNonVirtualStg = oldStg;
-	}
+        isFinal = oldFinal;
+        if (contexts.length > 0)
+            currentContext.hasNonVirtualStg = oldStg;
+    }
 
-	override void visit(AST.FuncDeclaration funcDecl)
-	{
-		if (contexts.length == 0)
-		{
-			super.visit(funcDecl);
-			return;
-		}
+    override void visit(AST.FuncDeclaration funcDecl)
+    {
+        if (contexts.length == 0)
+        {
+            super.visit(funcDecl);
+            return;
+        }
 
-		bool hasVirtualBody;
-		if (funcDecl.fbody !is null)
-		{
-			auto funcBody = funcDecl.fbody.isCompoundStatement();
-			hasVirtualBody = funcBody !is null && funcBody.statements !is null && (*funcBody.statements).length == 0;
-		}
-		else
-		{
-			hasVirtualBody = true;
-		}
+        bool hasVirtualBody;
+        if (funcDecl.fbody !is null)
+        {
+            auto funcBody = funcDecl.fbody.isCompoundStatement();
+            hasVirtualBody = funcBody !is null && funcBody.statements !is null && (*funcBody.statements).length == 0;
+        }
+        else
+        {
+            hasVirtualBody = true;
+        }
 
-		bool hasNonVirtualStg = currentContext.hasNonVirtualStg
-			|| funcDecl.storage_class & STC.static_ || funcDecl.storage_class & STC.final_;
+        bool hasNonVirtualStg = currentContext.hasNonVirtualStg
+            || funcDecl.storage_class & STC.static_ || funcDecl.storage_class & STC.final_;
 
-		if (!currentContext.canBeVirtual || currentContext.hasNonVirtualVis || hasNonVirtualStg || !hasVirtualBody)
-		{
-			super.visit(funcDecl);
-			return;
-		}
+        if (!currentContext.canBeVirtual || currentContext.hasNonVirtualVis || hasNonVirtualStg || !hasVirtualBody)
+        {
+            super.visit(funcDecl);
+            return;
+        }
 
-		string funcName = cast(string) funcDecl.ident.toString();
-		virtualFuncs[funcName] = true;
-	}
+        string funcName = cast(string) funcDecl.ident.toString();
+        virtualFuncs[funcName] = true;
+    }
 
-	override void visit(AST.CtorDeclaration ctorDecl)
-	{
-		if (contexts.length == 0)
-		{
-			super.visit(ctorDecl);
-			return;
-		}
+    override void visit(AST.CtorDeclaration ctorDecl)
+    {
+        if (contexts.length == 0)
+        {
+            super.visit(ctorDecl);
+            return;
+        }
 
-		currentContext.inCtor = true;
-		super.visit(ctorDecl);
-		currentContext.inCtor = false;
-	}
+        currentContext.inCtor = true;
+        super.visit(ctorDecl);
+        currentContext.inCtor = false;
+    }
 
-	override void visit(AST.CallExp callExp)
-	{
-		super.visit(callExp);
+    override void visit(AST.CallExp callExp)
+    {
+        super.visit(callExp);
 
-		if (contexts.length == 0)
-			return;
+        if (contexts.length == 0)
+            return;
 
-		auto identExp = callExp.e1.isIdentifierExp();
-		if (!currentContext.inCtor || identExp is null)
-			return;
+        auto identExp = callExp.e1.isIdentifierExp();
+        if (!currentContext.inCtor || identExp is null)
+            return;
 
-		string funcCall = cast(string) identExp.ident.toString();
-		ctorCalls ~= CallContext(funcCall, callExp.loc.linnum, callExp.loc.charnum);
-	}
+        string funcCall = cast(string) identExp.ident.toString();
+        ctorCalls ~= CallContext(funcCall, callExp.loc.linnum, callExp.loc.charnum);
+    }
 
-	private ref currentContext() @property
-	{
-		return contexts[$ - 1];
-	}
+    private ref currentContext() @property
+    {
+        return contexts[$ - 1];
+    }
 
-	private void pushContext(bool inClass)
-	{
-		contexts ~= FuncContext(inClass);
-	}
+    private void pushContext(bool inClass)
+    {
+        contexts ~= FuncContext(inClass);
+    }
 
-	private void popContext()
-	{
-		contexts.length--;
-	}
+    private void popContext()
+    {
+        contexts.length--;
+    }
 }
 
 unittest
 {
-	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
-	import std.format : format;
-	import std.stdio : stderr;
+    import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
+    import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
+    import std.format : format;
+    import std.stdio : stderr;
 
-	StaticAnalysisConfig sac = disabledConfig();
-	sac.vcall_in_ctor = Check.enabled;
-	string MSG = "a virtual call inside a constructor may lead to unexpected results in the derived classes";
+    StaticAnalysisConfig sac = disabledConfig();
+    sac.vcall_in_ctor = Check.enabled;
+    string MSG = "a virtual call inside a constructor may lead to unexpected results in the derived classes";
 
-	// fails
-	assertAnalyzerWarningsDMD(q{
+    // fails
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();} // [warn]: %s
@@ -203,7 +203,7 @@ unittest
         }
     }c.format(MSG), sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this()
@@ -217,7 +217,7 @@ unittest
         }
     }c.format(MSG, MSG), sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this()
@@ -230,8 +230,8 @@ unittest
         }
     }c.format(MSG), sac);
 
-	// passes
-	assertAnalyzerWarningsDMD(q{
+    // passes
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -239,7 +239,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -247,7 +247,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -255,7 +255,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -263,7 +263,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             this(){foo();}
@@ -271,7 +271,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         final class Bar
         {
             public:
@@ -280,7 +280,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Bar
         {
             public:
@@ -289,7 +289,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Foo
         {
             static void nonVirtual();
@@ -297,7 +297,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class Foo
         {
             package void nonVirtual();
@@ -305,7 +305,7 @@ unittest
         }
     }, sac);
 
-	assertAnalyzerWarningsDMD(q{
+    assertAnalyzerWarningsDMD(q{
         class C {
             static struct S {
             public:
@@ -317,5 +317,5 @@ unittest
         }
     }, sac);
 
-	stderr.writeln("Unittest for VcallCtorChecker passed");
+    stderr.writeln("Unittest for VcallCtorChecker passed");
 }
