@@ -24,6 +24,7 @@ import dscanner.analysis.del : DeleteCheck;
 import dscanner.analysis.enumarrayliteral : EnumArrayVisitor;
 import dscanner.analysis.explicitly_annotated_unittests : ExplicitlyAnnotatedUnittestCheck;
 import dscanner.analysis.final_attribute : FinalAttributeChecker;
+import dscanner.analysis.function_attributes : FunctionAttributeCheck;
 import dscanner.analysis.has_public_example : HasPublicExampleCheck;
 import dscanner.analysis.ifelsesame : IfElseSameCheck;
 import dscanner.analysis.imports_sortedness : ImportSortednessCheck;
@@ -323,6 +324,12 @@ MessageSet analyzeDmd(string fileName, ASTCodegen.Module m, const char[] moduleN
 		visitors ~= new AllManCheck(
 			fileName,
 			config.allman_braces_check == Check.skipTests && !ut
+		);
+
+	if (moduleName.shouldRunDmd!(FunctionAttributeCheck!ASTCodegen)(config))
+		visitors ~= new FunctionAttributeCheck!ASTCodegen(
+			fileName,
+			config.function_attribute_check == Check.skipTests && !ut
 		);
 
 	foreach (visitor; visitors)
