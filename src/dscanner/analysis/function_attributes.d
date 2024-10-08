@@ -89,6 +89,10 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 
 	override void visit(AST.FuncDeclaration fd)
 	{
+		import std.algorithm : canFind, filter, until;
+		import std.array : array;
+		import std.range : retro;
+
 		super.visit(fd);
 
 		if (fd.type is null)
@@ -104,21 +108,31 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 				addErrorMessage(lineNum, charNum, KEY, ABSTRACT_MSG);
 		}
 
-		if (inAggregate && fd.type.isTypeFunction())
+		auto tf = fd.type.isTypeFunction();
+
+		if (inAggregate && tf)
 		{
-			auto tf = fd.type.isTypeFunction();
 			string storageTok = getConstLikeStorage(tf.mod);
+			Token[] funcTokens = tokens.filter!(t => t.loc.fileOffset > fd.loc.fileOffset)
+				.until!(t => t.value == TOK.leftCurly)
+				.array;
 
 			if (storageTok is null)
 			{
-				immutable bool isStatic = (fd.storage_class & STC.static_) > 0;
-				immutable bool isZeroParamProperty = tf.isProperty() && tf.parameterList.parameters.length == 0;
-				if (!isStatic && isZeroParamProperty)
+				bool isStatic = (fd.storage_class & STC.static_) > 0;
+				bool isZeroParamProperty = tf.isProperty() && tf.parameterList.parameters.length == 0;
+				auto propertyIsAfterFunc = funcTokens.retro()
+					.until!(t => t.value == TOK.rightParenthesis)
+					.canFind!(t => t.ident.toString() == "property");
+
+				if (!isStatic && isZeroParamProperty && propertyIsAfterFunc)
 					addErrorMessage(lineNum, charNum, KEY, CONST_MSG);
 			}
 			else
 			{
-				if (!hasConstLikeAttribute(cast(ulong) fd.loc.fileOffset))
+				bool hasConstLikeAttribute = funcTokens.retro()
+					.canFind!(t => t.value == TOK.const_ || t.value == TOK.immutable_ || t.value == TOK.inout_);
+				if (!hasConstLikeAttribute)
 					addErrorMessage(lineNum, charNum, KEY, RETURN_MSG.format(storageTok));
 			}
 		}
@@ -136,36 +150,6 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 			return "inout";
 
 		return null;
-	}
-
-	private bool hasConstLikeAttribute(ulong fileOffset)
-	{
-		import dscanner.utils : readFile;
-		import dmd.errorsink : ErrorSinkNull;
-		import dmd.globals : global;
-		import dmd.lexer : Lexer;
-		import dmd.tokens : TOK;
-
-		auto bytes = readFile(fileName) ~ '\0';
-		bytes = bytes[fileOffset .. $];
-
-		__gshared ErrorSinkNull errorSinkNull;
-		if (!errorSinkNull)
-			errorSinkNull = new ErrorSinkNull;
-
-		scope lexer = new Lexer(null, cast(char*) bytes, 0, bytes.length, 0, 0, errorSinkNull, &global.compileEnv);
-		TOK nextTok = lexer.nextToken();
-
-		do
-		{
-			if (nextTok == TOK.const_ || nextTok == TOK.immutable_ || nextTok == TOK.inout_)
-				return true;
-
-			nextTok = lexer.nextToken();
-		}
-		while (nextTok != TOK.leftCurly && nextTok != TOK.endOfFile);
-
-		return false;
 	}
 }
 
