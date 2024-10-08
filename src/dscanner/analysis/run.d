@@ -655,10 +655,6 @@ BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		moduleScope
 	);
 
-	if (moduleName.shouldRun!FunctionAttributeCheck(analysisConfig))
-		checks ~= new FunctionAttributeCheck(args.setSkipTests(
-		analysisConfig.function_attribute_check == Check.skipTests && !ut));
-
 	return checks;
 }
 
