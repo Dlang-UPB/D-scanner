@@ -54,6 +54,7 @@ import dscanner.analysis.unused_variable : UnusedVariableCheck;
 import dscanner.analysis.useless_assert : UselessAssertCheck;
 import dscanner.analysis.useless_initializer : UselessInitializerChecker;
 import dscanner.analysis.vcall_in_ctor : VcallCtorChecker;
+import dscanner.analysis.allman : AllManCheck;
 
 version (unittest)
 	enum ut = true;

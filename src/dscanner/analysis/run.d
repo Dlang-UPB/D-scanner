@@ -69,7 +69,6 @@ import dscanner.analysis.properly_documented_public_functions;
 import dscanner.analysis.final_attribute;
 import dscanner.analysis.vcall_in_ctor;
 import dscanner.analysis.useless_initializer;
-import dscanner.analysis.allman;
 import dscanner.analysis.always_curly;
 import dscanner.analysis.redundant_attributes;
 import dscanner.analysis.has_public_example;
