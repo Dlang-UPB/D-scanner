@@ -104,7 +104,7 @@ unittest
 	sac.lambda_return_check = Check.enabled;
 	auto msg = "This lambda returns a lambda. Add parenthesis to clarify.";
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarningsDMD(`
 		void main()
 		{
 			int[] b;
@@ -115,9 +115,9 @@ unittest
 			pragma(msg, typeof(a => () { return a; }));
 			b.map!(a => a * 2);
 		}
-	}c.format(msg, msg, msg), sac);
+	`c.format(msg, msg, msg), sac);
 
-	assertAutoFix(q{
+	assertAutoFix(`
 		void main()
 		{
 			int[] b;
@@ -128,7 +128,7 @@ unittest
 			pragma(msg, typeof((a) => { return a; })); // fix:0
 			pragma(msg, typeof((a) => { return a; })); // fix:1
 		}
-	}c, q{
+	`c, `
 		void main()
 		{
 			int[] b;
@@ -139,7 +139,7 @@ unittest
 			pragma(msg, typeof((a) { return a; })); // fix:0
 			pragma(msg, typeof((a) => () { return a; })); // fix:1
 		}
-	}c, sac, true);
+	`c, sac, true);
 
 	stderr.writeln("Unittest for LambdaReturnCheck passed.");
 }
