@@ -162,7 +162,7 @@ unittest
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.function_attribute_check = Check.enabled;
 
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarningsDMD(`
 		int foo() @property { return 0; }
 
 		class ClassName {
@@ -190,10 +190,10 @@ unittest
 			int barConst() const @property;
 			abstract int method(); // [warn]: 'abstract' attribute is redundant in interface declarations
 		}
-	}c, sac);
+	`c, sac);
 
 	// Test taken from phobos / utf.d, shouldn't warn
-	assertAnalyzerWarningsDMD(q{
+	assertAnalyzerWarningsDMD(`
 		static struct R
 		{
 			@safe pure @nogc nothrow:
@@ -204,7 +204,7 @@ unittest
 			size_t idx;
 			string s;
 		}
-	}c, sac);
+	`c, sac);
 
 /* TODO: Fix AutoFix
 	assertAutoFix(q{
