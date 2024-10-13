@@ -89,7 +89,7 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 
 	override void visit(AST.FuncDeclaration fd)
 	{
-		import std.algorithm : canFind, filter, until;
+		import std.algorithm : canFind, find, filter, until;
 		import std.array : array;
 		import std.range : retro;
 
@@ -105,7 +105,21 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 		{
 			immutable bool isAbstract = (fd.storage_class & STC.abstract_) > 0;
 			if (isAbstract)
-				addErrorMessage(lineNum, charNum, KEY, ABSTRACT_MSG);
+			{
+				auto offset = tokens.filter!(t => t.loc.linnum >= fd.loc.linnum)
+					.until!(t => t.value == TOK.leftCurly)
+					.array
+					.retro()
+					.find!(t => t.value == TOK.abstract_)
+					.front.loc.fileOffset;
+
+				addErrorMessage(
+					lineNum, charNum, KEY, ABSTRACT_MSG,
+					[AutoFix.replacement(offset, offset + 8, "", "Remove `abstract` attribute")]
+				);
+
+				return;
+			}
 		}
 
 		auto tf = fd.type.isTypeFunction();
@@ -113,27 +127,73 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 		if (inAggregate && tf)
 		{
 			string storageTok = getConstLikeStorage(tf.mod);
+			auto bodyStartToken = TOK.leftCurly;
+			if (fd.fbody is null)
+				bodyStartToken = TOK.semicolon;
+
 			Token[] funcTokens = tokens.filter!(t => t.loc.fileOffset > fd.loc.fileOffset)
-				.until!(t => t.value == TOK.leftCurly)
+				.until!(t => t.value == TOK.leftCurly || t.value == bodyStartToken)
 				.array;
 
 			if (storageTok is null)
 			{
 				bool isStatic = (fd.storage_class & STC.static_) > 0;
 				bool isZeroParamProperty = tf.isProperty() && tf.parameterList.parameters.length == 0;
-				auto propertyIsAfterFunc = funcTokens.retro()
+				auto propertyRange = funcTokens.retro()
 					.until!(t => t.value == TOK.rightParenthesis)
-					.canFind!(t => t.ident.toString() == "property");
+					.find!(t => t.ident.toString() == "property")
+					.find!(t => t.value == TOK.at);
 
-				if (!isStatic && isZeroParamProperty && propertyIsAfterFunc)
-					addErrorMessage(lineNum, charNum, KEY, CONST_MSG);
+				if (!isStatic && isZeroParamProperty && !propertyRange.empty)
+					addErrorMessage(
+						lineNum, charNum, KEY, CONST_MSG,
+						[
+							AutoFix.insertionAt(propertyRange.front.loc.fileOffset, "const "),
+							AutoFix.insertionAt(propertyRange.front.loc.fileOffset, "inout "),
+							AutoFix.insertionAt(propertyRange.front.loc.fileOffset, "immutable "),
+						]
+					);
 			}
 			else
 			{
 				bool hasConstLikeAttribute = funcTokens.retro()
 					.canFind!(t => t.value == TOK.const_ || t.value == TOK.immutable_ || t.value == TOK.inout_);
+
 				if (!hasConstLikeAttribute)
-					addErrorMessage(lineNum, charNum, KEY, RETURN_MSG.format(storageTok));
+				{
+					auto funcRange = tokens.filter!(t => t.loc.linnum >= fd.loc.linnum)
+						.until!(t => t.value == TOK.leftBracket);
+					auto parensToken = funcRange.until!(t => t.value == TOK.leftParenthesis)
+						.array
+						.retro()
+						.front;
+					auto funcEndToken = funcRange.array
+						.retro()
+						.find!(t => t.value == TOK.rightParenthesis)
+						.front;
+					auto constLikeToken = funcRange
+						.find!(t => t.value == TOK.const_ || t.value == TOK.inout_ || t.value == TOK.immutable_)
+						.front;
+
+					string replacement;
+					if (constLikeToken.value == TOK.const_)
+						replacement = " const";
+					else if (constLikeToken.value == TOK.inout_)
+						replacement = " inout";
+					else
+						replacement = " immutable";
+
+					AutoFix fix1 = AutoFix
+						.replacement(constLikeToken.loc.fileOffset, constLikeToken.loc.fileOffset + 6, "",
+							"Move" ~ replacement ~ " after parameter list")
+						.concat(AutoFix.insertionAt(funcEndToken.loc.fileOffset + 1, replacement));
+
+					AutoFix fix2 = AutoFix.replacement(constLikeToken.loc.fileOffset + 5,
+							constLikeToken.loc.fileOffset + 6, "(", "Make return type const")
+						.concat(AutoFix.insertionAt(parensToken.loc.fileOffset - 1, ")"));
+
+					addErrorMessage(lineNum, charNum, KEY, RETURN_MSG.format(storageTok), [fix1, fix2]);
+				}
 			}
 		}
 	}
@@ -156,7 +216,7 @@ extern (C++) class FunctionAttributeCheck(AST) : BaseAnalyzerDmd
 unittest
 {
 	import dscanner.analysis.config : Check, disabledConfig, StaticAnalysisConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
+	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD, assertAutoFix;
 	import std.stdio : stderr;
 
 	StaticAnalysisConfig sac = disabledConfig();
@@ -206,7 +266,6 @@ unittest
 		}
 	`c, sac);
 
-/* TODO: Fix AutoFix
 	assertAutoFix(q{
 		int foo() @property { return 0; }
 
@@ -257,8 +316,7 @@ unittest
 
 			int method(); // fix
 		}
-	}c, sac);
-	*/
+	}c, sac, true);
 
 	stderr.writeln("Unittest for ObjectConstCheck passed.");
 }
