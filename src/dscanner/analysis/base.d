@@ -986,7 +986,7 @@ protected:
 
 	extern (D) MessageSet _messages;
 
-	protected extern (D) bool shouldIgnoreDecl(UserAttributeDeclaration userAtt, string key)
+	extern (D) bool shouldIgnoreDecl(UserAttributeDeclaration userAtt, string key)
 	{
 		import std.algorithm : startsWith;
 		import std.string : indexOf;
