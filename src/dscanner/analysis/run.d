@@ -663,10 +663,6 @@ BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		checks ~= new MismatchedArgumentCheck(args.setSkipTests(
 		analysisConfig.mismatched_args_check == Check.skipTests && !ut));
 
-	if (moduleName.shouldRun!UndocumentedDeclarationCheck(analysisConfig))
-		checks ~= new UndocumentedDeclarationCheck(args.setSkipTests(
-		analysisConfig.undocumented_declaration_check == Check.skipTests && !ut));
-
 	if (moduleName.shouldRun!IfConstraintsIndentCheck(analysisConfig))
 		checks ~= new IfConstraintsIndentCheck(args.setSkipTests(
 		analysisConfig.if_constraints_indent == Check.skipTests && !ut));
