@@ -31,7 +31,31 @@ extern (C++) class LambdaReturnCheck(AST) : BaseAnalyzerDmd
 		import dmd.globals : global;
 		import dmd.lexer : Lexer;
 
-		auto bytes = readFile(fileName) ~ '\0';
+		auto rawCode = readFile(fileName) ~ '\0';
+		ubyte[] bytes = rawCode;
+
+		version (Windows)
+		{
+			bytes = [];
+			bool previousIsCR;
+			foreach (ch; rawCode)
+			{
+				if (ch == '\r')
+				{
+					if (previousIsCR)
+						continue;
+
+					previousIsCR = true;
+				}
+				else
+				{
+					previousIsCR = false;
+				}
+
+				bytes ~= ch;
+			}
+		}
+
 		__gshared ErrorSinkNull errorSinkNull;
 		if (!errorSinkNull)
 			errorSinkNull = new ErrorSinkNull;
@@ -104,7 +128,7 @@ unittest
 	sac.lambda_return_check = Check.enabled;
 	auto msg = "This lambda returns a lambda. Add parenthesis to clarify.";
 
-	assertAnalyzerWarningsDMD(`
+	assertAnalyzerWarningsDMD(q{
 		void main()
 		{
 			int[] b;
@@ -115,9 +139,9 @@ unittest
 			pragma(msg, typeof(a => () { return a; }));
 			b.map!(a => a * 2);
 		}
-	`c.format(msg, msg, msg), sac);
+	}c.format(msg, msg, msg), sac);
 
-	assertAutoFix(`
+	assertAutoFix(q{
 		void main()
 		{
 			int[] b;
@@ -128,7 +152,7 @@ unittest
 			pragma(msg, typeof((a) => { return a; })); // fix:0
 			pragma(msg, typeof((a) => { return a; })); // fix:1
 		}
-	`c, `
+	}, q{
 		void main()
 		{
 			int[] b;
@@ -139,7 +163,7 @@ unittest
 			pragma(msg, typeof((a) { return a; })); // fix:0
 			pragma(msg, typeof((a) => () { return a; })); // fix:1
 		}
-	`c, sac, true);
+	}, sac, true);
 
 	stderr.writeln("Unittest for LambdaReturnCheck passed.");
 }
