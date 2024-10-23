@@ -117,7 +117,7 @@ unittest
 		}
 	`c.format(msg, msg, msg), sac);
 
-	assertAutoFix(`
+	assertAutoFix("
 		void main()
 		{
 			int[] b;
@@ -128,7 +128,7 @@ unittest
 			pragma(msg, typeof((a) => { return a; })); // fix:0
 			pragma(msg, typeof((a) => { return a; })); // fix:1
 		}
-	`c, `
+	", "
 		void main()
 		{
 			int[] b;
@@ -139,7 +139,7 @@ unittest
 			pragma(msg, typeof((a) { return a; })); // fix:0
 			pragma(msg, typeof((a) => () { return a; })); // fix:1
 		}
-	`c, sac, true);
+	", sac, true);
 
 	stderr.writeln("Unittest for LambdaReturnCheck passed.");
 }
