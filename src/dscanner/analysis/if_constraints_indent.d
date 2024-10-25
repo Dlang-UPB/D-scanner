@@ -6,10 +6,6 @@ module dscanner.analysis.if_constraints_indent;
 
 import dscanner.analysis.base;
 import dmd.tokens : Token, TOK;
-import std.typecons : Tuple, tuple;
-
-// TODO: remove
-import std.stdio : writeln;
 
 /**
 Checks whether all if constraints have the same indention as their declaration.
@@ -23,8 +19,6 @@ extern (C++) class IfConstraintsIndentCheck(AST) : BaseAnalyzerDmd
 	private enum string MSG = "If constraints should have the same indentation as the function";
 
 	private Token[] tokens;
-	alias FileOffset = uint;
-	private uint[FileOffset] tokenIndexes;
 
 	extern (D) this(string fileName, bool skipTests = false)
 	{
@@ -51,13 +45,13 @@ extern (C++) class IfConstraintsIndentCheck(AST) : BaseAnalyzerDmd
 		{
 			lexer.nextToken();
 			tokens ~= lexer.token;
-			tokenIndexes[lexer.token.loc.fileOffset] = cast(uint) tokens.length - 1;
 		}
 		while (lexer.token.value != TOK.endOfFile);
 	}
 
 	override void visit(AST.TemplateDeclaration templateDecl)
 	{
+		import std.array : array;
 		import std.algorithm : filter;
 		import std.range : front, retro;
 
@@ -66,66 +60,22 @@ extern (C++) class IfConstraintsIndentCheck(AST) : BaseAnalyzerDmd
 		if (templateDecl.constraint is null || templateDecl.members is null)
 			return;
 
-		auto firstMember = (*(templateDecl.members))[0];
-		uint templateLine = templateDecl.loc.linnum;
-		uint templateCol = templateDecl.loc.charnum;
+		auto firstTemplateToken = tokens.filter!(t => t.loc.linnum == templateDecl.loc.linnum)
+			.filter!(t => t.value != TOK.whitespace)
+			.front;
+		uint templateLine = firstTemplateToken.loc.linnum;
+		uint templateCol = firstTemplateToken.loc.charnum;
 
-		auto templateTokenIdx = tokenIndexes[templateDecl.loc.fileOffset];
-		if (tokens[templateTokenIdx].value != TOK.template_)
-		{
-			if (auto func = firstMember.isFuncDeclaration())
-			{
-				auto loc = computeFunctionTemplateLoc(func);
-				templateLine = loc[0];
-				templateCol = loc[1];
-			}
-			else
-			{
-				templateLine = firstMember.loc.linnum;
-				templateCol = firstMember.loc.charnum;
-			}
-		}
-
-		int constraintIdx = tokenIndexes[templateDecl.constraint.loc.fileOffset];
-		auto constraintToken = tokens[0 .. constraintIdx].retro.filter!(t => t.value == TOK.if_).front;
+		auto constraintToken = tokens.filter!(t => t.loc.fileOffset <= templateDecl.constraint.loc.fileOffset)
+			.array()
+			.retro()
+			.filter!(t => t.value == TOK.if_)
+			.front;
 		uint constraintLine = constraintToken.loc.linnum;
 		uint constraintCol = constraintToken.loc.charnum;
 
 		if (templateLine == constraintLine || templateCol != constraintCol)
 			addErrorMessage(cast(ulong) constraintLine, cast(ulong) constraintCol, KEY, MSG);
-	}
-
-	private Tuple!(uint, uint) computeFunctionTemplateLoc(AST.FuncDeclaration func)
-	{
-		import std.algorithm : canFind;
-		import std.conv : to;
-
-		auto typeFunc = func.type.isTypeFunction();
-		if (typeFunc && typeFunc.next)
-		{
-			if (auto type = typeFunc.next.isTypeInstance())
-			{
-				return tuple(type.loc.linnum, type.loc.charnum);
-			}
-			else if (to!string(typeFunc.next.kind()).canFind("array"))
-			{
-				auto idx = tokenIndexes[func.loc.fileOffset] - 1;
-				while (tokens[idx].value == TOK.rightBracket)
-				{
-					while (tokens[idx].value != TOK.leftBracket)
-						idx--;
-
-					idx--;
-				}
-
-				auto token = tokens[idx];
-				return tuple(token.loc.linnum, token.loc.charnum);
-			}
-		}
-
-		auto idx = tokenIndexes[func.loc.fileOffset] - 1;
-		auto token = tokens[idx];
-		return tuple(token.loc.linnum, token.loc.charnum);
 	}
 }
 
@@ -139,35 +89,6 @@ unittest
 	StaticAnalysisConfig sac = disabledConfig();
 	sac.if_constraints_indent = Check.enabled;
 	enum MSG = "If constraints should have the same indentation as the function";
-
-	assertAnalyzerWarningsDMD(q{
-void test(alias matchFn)()
-{
-	auto baz(Cap)(Cap m)
-	if (is(Cap == Captures!(Cap.String)))
-	{
-	    return toUpper(m.hit);
-	}
-}
-	}c, sac);
-
-	assertAnalyzerWarningsDMD(q{
-ElementType!(A) pop (A) (ref A a)
-if (isDynamicArray!(A) && !isNarrowString!(A) && isMutable!(A) && !is(A == void[]))
-{
-    auto e = a.back;
-    a.popBack();
-    return e;
-}
-	}c, sac);
-
-	assertAnalyzerWarningsDMD(q{
-	template HMAC(H)
-	if (isDigest!H && hasBlockSize!H)
-	{
-	    alias HMAC = HMAC!(H, H.blockSize);
-	}
-	}, sac);
 
 	assertAnalyzerWarningsDMD(q{
 void foo(R)(R r)
@@ -260,6 +181,51 @@ if // [warn]: %s
 	struct CRC(uint N, ulong P) if (N == 32 || N == 64) // [warn]: %s
 	{}
 	}c.format(MSG), sac);
+
+	assertAnalyzerWarningsDMD(q{
+private template sharedToString(alias field)
+if (is(typeof(field) == shared))
+{
+    static immutable sharedToString = typeof(field).stringof;
+}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+private union EndianSwapper(T)
+if (canSwapEndianness!T)
+{
+    T value;
+}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+void test(alias matchFn)()
+{
+	auto baz(Cap)(Cap m)
+	if (is(Cap == Captures!(Cap.String)))
+	{
+	    return toUpper(m.hit);
+	}
+}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+ElementType!(A) pop (A) (ref A a)
+if (isDynamicArray!(A) && !isNarrowString!(A) && isMutable!(A) && !is(A == void[]))
+{
+    auto e = a.back;
+    a.popBack();
+    return e;
+}
+	}c, sac);
+
+	assertAnalyzerWarningsDMD(q{
+	template HMAC(H)
+	if (isDigest!H && hasBlockSize!H)
+	{
+	    alias HMAC = HMAC!(H, H.blockSize);
+	}
+	}, sac);
 
 	stderr.writeln("Unittest for IfConstraintsIndentCheck passed.");
 }
