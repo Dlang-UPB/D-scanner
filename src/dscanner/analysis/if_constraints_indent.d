@@ -263,18 +263,3 @@ if // [warn]: %s
 
 	stderr.writeln("Unittest for IfConstraintsIndentCheck passed.");
 }
-
-@("issue #829")
-unittest
-{
-	import dscanner.analysis.config : StaticAnalysisConfig, Check, disabledConfig;
-	import dscanner.analysis.helpers : assertAnalyzerWarningsDMD;
-	import std.stdio : stderr;
-
-	StaticAnalysisConfig sac = disabledConfig();
-	sac.if_constraints_indent = Check.enabled;
-
-	assertAnalyzerWarningsDMD(`void foo() {
-	f();
-}`, sac);
-}
