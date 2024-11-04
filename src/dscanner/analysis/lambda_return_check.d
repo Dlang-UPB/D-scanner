@@ -31,31 +31,7 @@ extern (C++) class LambdaReturnCheck(AST) : BaseAnalyzerDmd
 		import dmd.globals : global;
 		import dmd.lexer : Lexer;
 
-		auto rawCode = readFile(fileName) ~ '\0';
-		ubyte[] bytes = rawCode;
-
-		version (Windows)
-		{
-			bytes = [];
-			bool previousIsCR;
-			foreach (ch; rawCode)
-			{
-				if (ch == '\r')
-				{
-					if (previousIsCR)
-						continue;
-
-					previousIsCR = true;
-				}
-				else
-				{
-					previousIsCR = false;
-				}
-
-				bytes ~= ch;
-			}
-		}
-
+		auto bytes = readFile(fileName) ~ '\0';
 		__gshared ErrorSinkNull errorSinkNull;
 		if (!errorSinkNull)
 			errorSinkNull = new ErrorSinkNull;
