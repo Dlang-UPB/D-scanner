@@ -655,6 +655,11 @@ BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 		moduleScope
 	);
 
+	// Add those lines to suppress warnings about unused variables until cleanup is complete
+	bool ignoreVar = analysisConfig.if_constraints_indent == Check.skipTests;
+	bool ignoreVar2 = args.skipTests;
+	ignoreVar = ignoreVar || ignoreVar2;
+
 	return checks;
 }
 
