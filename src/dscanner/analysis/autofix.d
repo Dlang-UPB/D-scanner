@@ -14,6 +14,7 @@ import dsymbol.modulecache : ModuleCache;
 import dscanner.analysis.base : AutoFix, AutoFixFormatting, BaseAnalyzer, Message;
 import dscanner.analysis.config : StaticAnalysisConfig;
 import dscanner.analysis.run : analyze, doNothing;
+import dscanner.analysis.rundmd;
 import dscanner.utils : readFile, readStdin;
 
 private void resolveAutoFixes(
@@ -73,8 +74,7 @@ private void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, stri
 		}
 	}
 
-	throw new Exception("Cannot find analyzer " ~ messageCheckName
-	~ " to resolve autofix with.");
+	throw new Exception("Cannot find analyzer " ~ messageCheckName ~ " to resolve autofix with.");
 }
 
 void resolveAutoFixFromCheck(
@@ -120,6 +120,7 @@ void listAutofixes(
 {
 	import dparse.parser : parseModule;
 	import dscanner.analysis.base : Message;
+	import dscanner.utils : getModuleName;
 	import std.format : format;
 	import std.json : JSONValue;
 
@@ -160,7 +161,9 @@ void listAutofixes(
 	: readFile(fileName), lexerConfig, cache);
 	auto mod = parseModule(tokens, fileName, &rba, toDelegate(&doNothing));
 
-	auto messages = analyze(fileName, mod, config, moduleCache, tokens);
+	auto code = readFile(fileName);
+	auto dmdModule = parseDmdModule(fileName, cast(string) code);
+	auto messages = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 
 	with (stdout.lockingTextWriter)
 	{
