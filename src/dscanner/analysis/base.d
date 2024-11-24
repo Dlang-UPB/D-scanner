@@ -395,7 +395,7 @@ mixin template AnalyzerInfo(string checkName)
 {
 	enum string name = checkName;
 
-	extern(D) override protected string getName()
+	extern (D) override protected string getName()
 	{
 		return name;
 	}
@@ -588,7 +588,7 @@ extern(C++) class BaseAnalyzerDmd : SemanticTimeTransitiveVisitor
 	 * Ensures that template AnalyzerInfo is instantiated in all classes
 	 *  deriving from this class
 	 */
-	extern(D) protected string getName()
+	extern(D) string getName()
 	{
 		assert(0);
 	}
