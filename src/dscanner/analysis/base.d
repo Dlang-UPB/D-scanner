@@ -617,6 +617,13 @@ protected:
 		_messages.insert(Message(fileName, line, column, key, message, getName(), autofixes));
 	}
 
+	extern (D) void addErrorMessage(size_t[2] index, size_t[2] lines, size_t[2] columns,
+		string key, string message, AutoFix[] autofixes)
+	{
+		auto diag = Message.Diagnostic.from(fileName, index, lines, columns, message);
+		_messages.insert(Message(diag, key, getName(), autofixes));
+	}
+
 	extern (D) bool skipTests;
 
 	/**
