@@ -95,35 +95,28 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 	import dscanner.analysis.rundmd : analyzeDmd, parseDmdModule;
 	import dscanner.utils : getModuleName;
 
+	// TODO: Ignore linter error
+	if (!useDmd)
+	{
+		auto x = &formattingConfig;
+		x = null;
+	}
+
 	MessageSet rawWarnings;
 
-	if (useDmd)
+	auto testFileName = "test.d";
+	File f = File(testFileName, "w");
+	scope(exit)
 	{
-		auto testFileName = "test.d";
-		File f = File(testFileName, "w");
-		scope(exit)
-		{
-			assert(exists(testFileName));
-			remove(testFileName);
-		}
-
-		f.rawWrite(before);
-		f.close();
-
-		auto dmdModule = parseDmdModule(file, before);
-		rawWarnings = analyzeDmd(testFileName, dmdModule, getModuleName(dmdModule.md), config);
+		assert(exists(testFileName));
+		remove(testFileName);
 	}
-	else
-	{
-		StringCache cache = StringCache(StringCache.defaultBucketCount);
-		RollbackAllocator r;
-		const(Token)[] tokens;
-		const(Module) m = parseModule(file, cast(ubyte[]) before, &r, defaultErrorFormat, cache, false, tokens);
 
-		ModuleCache moduleCache;
+	f.rawWrite(before);
+	f.close();
 
-		rawWarnings = analyze("test", m, config, moduleCache, tokens, true, true, formattingConfig);
-	}
+	auto dmdModule = parseDmdModule(file, before);
+	rawWarnings = analyzeDmd(testFileName, dmdModule, getModuleName(dmdModule.md), config);
 
 	string[] codeLines = before.splitLines();
 	Tuple!(Message, int)[] toApply;

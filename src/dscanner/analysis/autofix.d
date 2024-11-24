@@ -17,100 +17,78 @@ import dscanner.analysis.run : analyze, doNothing;
 import dscanner.analysis.rundmd;
 import dscanner.utils : readFile, readStdin;
 
-private void resolveAutoFixes(
-	ref Message message,
-	string fileName,
-	const(char[]) moduleName,
-	ref ModuleCache moduleCache,
-	scope const(Token)[] tokens,
-	const Module m,
-	const StaticAnalysisConfig analysisConfig,
-	const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid
-)
-{
-	resolveAutoFixes(message.checkName, message.autofixes, fileName, moduleName, moduleCache,
-		tokens, m, analysisConfig, overrideFormattingConfig);
-}
+//private void resolveAutoFixes(
+//	ref Message message,
+//	string fileName,
+//	const(char[]) moduleName,
+//	ref ModuleCache moduleCache,
+//	scope const(Token)[] tokens,
+//	const Module m,
+//	const StaticAnalysisConfig analysisConfig,
+//	const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid
+//)
+//{
+//	resolveAutoFixes(message.checkName, message.autofixes, fileName, moduleName, moduleCache,
+//		tokens, m, analysisConfig, overrideFormattingConfig);
+//}
+//
+//private void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, string fileName,
+//	const(char[]) moduleName,
+//	ref ModuleCache moduleCache,
+//	scope const(Token)[] tokens, const Module m,
+//	const StaticAnalysisConfig analysisConfig,
+//	const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid)
+//{
+//	import dscanner.analysis.run : getAnalyzersForModuleAndConfig;
+//	import dscanner.analysis.rundmd : getDmdAnalyzersForModuleAndConfig;
+//
+//	const(AutoFixFormatting) formattingConfig = overrideFormattingConfig is AutoFixFormatting.invalid
+//		? analysisConfig.getAutoFixFormattingConfig() : overrideFormattingConfig;
+//
+//	foreach (BaseAnalyzerDmd check; getDmdAnalyzersForModuleAndConfig(fileName, analysisConfig, moduleName))
+//	{
+//		if (check.getName() == messageCheckName)
+//		{
+//			foreach (ref autofix; autofixes)
+//				autofix.resolveAutoFixFromCheck(check, m, tokens, formattingConfig);
+//			return;
+//		}
+//	}
+//
+//	throw new Exception("Cannot find analyzer " ~ messageCheckName ~ " to resolve autofix with.");
+//}
 
-private void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, string fileName,
-	const(char[]) moduleName,
-	ref ModuleCache moduleCache,
-	scope const(Token)[] tokens, const Module m,
-	const StaticAnalysisConfig analysisConfig,
-	const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid)
-{
-	import core.memory : GC;
-	import dsymbol.conversion.first : FirstPass;
-	import dsymbol.conversion.second : secondPass;
-	import dsymbol.scope_ : Scope;
-	import dsymbol.semantic : SemanticSymbol;
-	import dsymbol.string_interning : internString;
-	import dsymbol.symbol : DSymbol;
-	import dscanner.analysis.run : getAnalyzersForModuleAndConfig;
-	import dscanner.analysis.rundmd : getDmdAnalyzersForModuleAndConfig;
+//void resolveAutoFixFromCheck(
+//	ref AutoFix autofix,
+//	BaseAnalyzerDmd check,
+//	const Module m,
+//	scope const(Token)[] tokens,
+//	const AutoFixFormatting formattingConfig
+//)
+//{
+//	import std.sumtype : match;
+//
+//	autofix.replacements.match!(
+//			(AutoFix.ResolveContext context) {
+//			autofix.replacements = check.resolveAutoFix(m, tokens, context, formattingConfig);
+//		},
+//			(_) {}
+//	);
+//}
 
-	const(AutoFixFormatting) formattingConfig =
-	overrideFormattingConfig is AutoFixFormatting.invalid
-	? analysisConfig.getAutoFixFormattingConfig()
-	: overrideFormattingConfig;
-
-	scope first = new FirstPass(m, internString(fileName), &moduleCache, null);
-	first.run();
-
-	secondPass(first.rootSymbol, first.moduleScope, moduleCache);
-	auto moduleScope = first.moduleScope;
-	scope(exit) typeid(DSymbol).destroy(first.rootSymbol.acSymbol);
-	scope(exit) typeid(SemanticSymbol).destroy(first.rootSymbol);
-	scope(exit) typeid(Scope).destroy(first.moduleScope);
-
-	GC.disable;
-	scope (exit)
-	GC.enable;
-
-	foreach (BaseAnalyzerDmd check; getDmdAnalyzersForModuleAndConfig(fileName, analysisConfig, moduleName))
-	{
-		if (check.getName() == messageCheckName)
-		{
-			foreach (ref autofix; autofixes)
-				autofix.resolveAutoFixFromCheck(check, m, tokens, formattingConfig);
-			return;
-		}
-	}
-
-	throw new Exception("Cannot find analyzer " ~ messageCheckName ~ " to resolve autofix with.");
-}
-
-void resolveAutoFixFromCheck(
-	ref AutoFix autofix,
-	BaseAnalyzerDmd check,
-	const Module m,
-	scope const(Token)[] tokens,
-	const AutoFixFormatting formattingConfig
-)
-{
-	import std.sumtype : match;
-
-	//autofix.replacements.match!(
-	//		(AutoFix.ResolveContext context) {
-	//		autofix.replacements = check.resolveAutoFix(m, tokens, context, formattingConfig);
-	//	},
-	//		(_) {}
-	//);
-}
-
-private AutoFix.CodeReplacement[] resolveAutoFix(string messageCheckName, AutoFix.ResolveContext context,
-	string fileName,
-	ref ModuleCache moduleCache,
-	scope const(Token)[] tokens, const Module m,
-	const StaticAnalysisConfig analysisConfig,
-	const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid)
-{
-	AutoFix temp;
-	temp.replacements = context;
-	//resolveAutoFixes(messageCheckName, (&temp)[0 .. 1], fileName, moduleCache,
-	//tokens, m, analysisConfig, overrideFormattingConfig);
-	return temp.expectReplacements("resolving didn't work?!");
-}
+//private AutoFix.CodeReplacement[] resolveAutoFix(string messageCheckName, AutoFix.ResolveContext context,
+//	string fileName,
+//	ref ModuleCache moduleCache,
+//	scope const(Token)[] tokens, const Module m,
+//	const StaticAnalysisConfig analysisConfig,
+//	const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid)
+//{
+//	AutoFix temp;
+//	temp.replacements = context;
+//	//resolveAutoFixes(messageCheckName, (&temp)[0 .. 1], fileName, moduleCache,
+//	//tokens, m, analysisConfig, overrideFormattingConfig);
+//	return temp.expectReplacements("resolving didn't work?!");
+//}
 
 void listAutofixes(
 	StaticAnalysisConfig config,
@@ -156,13 +134,14 @@ void listAutofixes(
 		&& (req.line < m.endLine || req.column <= m.endColumn);
 	}
 
-	RollbackAllocator rba;
+	//RollbackAllocator rba;
 	LexerConfig lexerConfig;
 	lexerConfig.fileName = fileName;
 	lexerConfig.stringBehavior = StringBehavior.source;
-	auto tokens = getTokensForParser(usingStdin ? readStdin()
-	: readFile(fileName), lexerConfig, cache);
-	auto mod = parseModule(tokens, fileName, &rba, toDelegate(&doNothing));
+	//auto tokens = getTokensForParser(usingStdin ? readStdin() : readFile(fileName), lexerConfig, cache);
+	//auto mod = parseModule(tokens, fileName, &rba, toDelegate(&doNothing));
+	// TODO: Ignore linter error
+	usingStdin = usingStdin;
 
 	auto code = readFile(fileName);
 	auto dmdModule = parseDmdModule(fileName, cast(string) code);

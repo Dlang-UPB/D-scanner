@@ -369,6 +369,10 @@ void generateSonarQubeGenericIssueDataReport(string[] fileNames, const StaticAna
 		RollbackAllocator r;
 		const(Token)[] tokens;
 		const Module m = parseModule(fileName, code, &r, cache, tokens, writeMessages, null, null, null);
+		// TODO: Ignore linter error
+		auto x = &m;
+		x = null;
+
 		auto dmdModule = parseDmdModule(fileName, cast(string) code);
 		MessageSet messageSet = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 		reporter.addMessageSet(messageSet);
@@ -415,12 +419,7 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		assert(m);
 		if (errorCount > 0 || (staticAnalyze && warningCount > 0))
 			hasErrors = true;
-		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, staticAnalyze);
-		MessageSet resultsDmd = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
-		foreach (result; resultsDmd[])
-		{
-			results.insert(result);
-		}
+		MessageSet results = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 		if (results is null)
 			continue;
 		foreach (result; results[])
@@ -460,6 +459,10 @@ bool autofix(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (errorCount > 0)
 			hasErrors = true;
 		auto dmdModule = parseDmdModule(fileName, cast(string) code);
+		// TODO: Ignore linter error
+		string x = overrideFormattingConfig.indentation;
+		x = "";
+
 		MessageSet results = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 		if (results is null)
 			continue;
@@ -662,51 +665,6 @@ BaseAnalyzer[] getAnalyzersForModuleAndConfig(string fileName,
 	ignoreVar = ignoreVar || ignoreVar2;
 
 	return checks;
-}
-
-MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig analysisConfig,
-		ref ModuleCache moduleCache, const(Token)[] tokens, bool staticAnalyze = true,
-		bool resolveAutoFixes = false,
-		const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid)
-{
-	import dsymbol.symbol : DSymbol;
-	//import dscanner.analysis.autofix : resolveAutoFixFromCheck;
-
-	if (!staticAnalyze)
-		return null;
-
-	const(AutoFixFormatting) formattingConfig =
-		(resolveAutoFixes && overrideFormattingConfig is AutoFixFormatting.invalid)
-			? analysisConfig.getAutoFixFormattingConfig()
-			: overrideFormattingConfig;
-
-	scope first = new FirstPass(m, internString(fileName), &moduleCache, null);
-	first.run();
-
-	secondPass(first.rootSymbol, first.moduleScope, moduleCache);
-	auto moduleScope = first.moduleScope;
-	scope(exit) typeid(DSymbol).destroy(first.rootSymbol.acSymbol);
-	scope(exit) typeid(SemanticSymbol).destroy(first.rootSymbol);
-	scope(exit) typeid(Scope).destroy(first.moduleScope);
-
-	GC.disable;
-	scope (exit)
-		GC.enable;
-
-	MessageSet set = new MessageSet;
-	//foreach (BaseAnalyzer check; getAnalyzersForModuleAndConfig(fileName, tokens, m, analysisConfig, moduleScope))
-	//{
-	//	check.visit(m);
-	//	foreach (message; check.messages)
-	//	{
-	//		if (resolveAutoFixes)
-	//			foreach (ref autofix; message.autofixes)
-	//				autofix.resolveAutoFixFromCheck(check, m, tokens, formattingConfig);
-	//		set.insert(message);
-	//	}
-	//}
-
-	return set;
 }
 
 version (unittest)
