@@ -82,31 +82,6 @@ struct AutoFix
 		return ret;
 	}
 
-	static AutoFix replacement(const Token token, string newText, string name = null)
-	{
-		if (!name.length)
-		{
-			auto text = token.text.length ? token.text : str(token.type);
-			if (newText.length)
-				name = "Replace `" ~ text ~ "` with `" ~ newText ~ "`";
-			else
-				name = "Remove `" ~ text ~ "`";
-		}
-		return replacement([token], newText, name);
-	}
-
-	static AutoFix replacement(const BaseNode node, string newText, string name)
-	{
-		return replacement(node.tokens, newText, name);
-	}
-
-	static AutoFix replacement(const Token[] tokens, string newText, string name)
-	in(tokens.length > 0, "must provide at least one token")
-	{
-		auto end = tokens[$ - 1].text.length ? tokens[$ - 1].text : str(tokens[$ - 1].type);
-		return replacement([tokens[0].index, tokens[$ - 1].index + end.length], newText, name);
-	}
-
 	static AutoFix replacement(size_t[2] range, string newText, string name)
 	{
 		AutoFix ret;
@@ -115,17 +90,6 @@ struct AutoFix
 			AutoFix.CodeReplacement(range, newText)
 		];
 		return ret;
-	}
-
-	static AutoFix insertionBefore(const Token token, string content, string name = null)
-	{
-		return insertionAt(token.index, content, name);
-	}
-
-	static AutoFix insertionAfter(const Token token, string content, string name = null)
-	{
-		auto tokenText = token.text.length ? token.text : str(token.type);
-		return insertionAt(token.index + tokenText.length, content, name);
 	}
 
 	static AutoFix insertionAt(size_t index, string content, string name = null)
@@ -140,24 +104,6 @@ struct AutoFix
 		ret.replacements = [
 			AutoFix.CodeReplacement([index, index], content)
 		];
-		return ret;
-	}
-
-	static AutoFix indentLines(scope const(Token)[] tokens, const AutoFixFormatting formatting, string name = "Indent code")
-	{
-		CodeReplacement[] inserts;
-		size_t line = -1;
-		foreach (token; tokens)
-		{
-			if (line != token.line)
-			{
-				line = token.line;
-				inserts ~= CodeReplacement([token.index, token.index], formatting.indentation);
-			}
-		}
-		AutoFix ret;
-		ret.name = name;
-		ret.replacements = inserts;
 		return ret;
 	}
 
@@ -290,33 +236,6 @@ struct Message
 
 		deprecated("Use startLine instead") alias line = startLine;
 		deprecated("Use startColumn instead") alias column = startColumn;
-
-		static Diagnostic from(string fileName, const BaseNode node, string message)
-		{
-			return from(fileName, node !is null ? node.tokens : [], message);
-		}
-
-		static Diagnostic from(string fileName, const Token token, string message)
-		{
-			auto text = token.text.length ? token.text : str(token.type);
-			return from(fileName,
-				[token.index, token.index + text.length],
-				token.line,
-				[token.column, token.column + text.length],
-				message);
-		}
-
-		static Diagnostic from(string fileName, const Token[] tokens, string message)
-		{
-			auto start = tokens.length ? tokens[0] : Token.init;
-			auto end = tokens.length ? tokens[$ - 1] : Token.init;
-			auto endText = end.text.length ? end.text : str(end.type);
-			return from(fileName,
-				[start.index, end.index + endText.length],
-				[start.line, end.line],
-				[start.column, end.column + endText.length],
-				message);
-		}
 
 		static Diagnostic from(string fileName, size_t[2] index, size_t line, size_t[2] columns, string message)
 		{
@@ -503,48 +422,6 @@ protected:
 		}
 	}
 
-	deprecated("Use the overload taking start and end locations or a Node instead")
-	void addErrorMessage(size_t line, size_t column, string key, string message)
-	{
-		_messages.insert(Message(fileName, line, column, key, message, getName()));
-	}
-
-	void addErrorMessage(const BaseNode node, string key, string message, AutoFix[] autofixes = null)
-	{
-		addErrorMessage(Message.Diagnostic.from(fileName, node, message), key, autofixes);
-	}
-
-	void addErrorMessage(const Token token, string key, string message, AutoFix[] autofixes = null)
-	{
-		addErrorMessage(Message.Diagnostic.from(fileName, token, message), key, autofixes);
-	}
-
-	void addErrorMessage(const Token[] tokens, string key, string message, AutoFix[] autofixes = null)
-	{
-		addErrorMessage(Message.Diagnostic.from(fileName, tokens, message), key, autofixes);
-	}
-
-	void addErrorMessage(size_t[2] index, size_t line, size_t[2] columns, string key, string message, AutoFix[] autofixes = null)
-	{
-		addErrorMessage(index, [line, line], columns, key, message, autofixes);
-	}
-
-	void addErrorMessage(size_t[2] index, size_t[2] lines, size_t[2] columns, string key, string message, AutoFix[] autofixes = null)
-	{
-		auto d = Message.Diagnostic.from(fileName, index, lines, columns, message);
-		_messages.insert(Message(d, key, getName(), autofixes));
-	}
-
-	void addErrorMessage(Message.Diagnostic diagnostic, string key, AutoFix[] autofixes = null)
-	{
-		_messages.insert(Message(diagnostic, key, getName(), autofixes));
-	}
-
-	void addErrorMessage(Message.Diagnostic diagnostic, Message.Diagnostic[] supplemental, string key, AutoFix[] autofixes = null)
-	{
-		_messages.insert(Message(diagnostic, supplemental, key, getName(), autofixes));
-	}
-
 	/**
 	 * The file name
 	 */
@@ -553,20 +430,6 @@ protected:
 	const(Scope)* sc;
 
 	MessageSet _messages;
-}
-
-/// Find the token with the given type, otherwise returns the whole range or a user-specified fallback, if set.
-const(Token)[] findTokenForDisplay(const BaseNode node, IdType type, const(Token)[] fallback = null)
-{
-	return node.tokens.findTokenForDisplay(type, fallback);
-}
-/// ditto
-const(Token)[] findTokenForDisplay(const Token[] tokens, IdType type, const(Token)[] fallback = null)
-{
-	foreach (i, token; tokens)
-		if (token.type == type)
-			return tokens[i .. i + 1];
-	return fallback is null ? tokens : fallback;
 }
 
 /**
