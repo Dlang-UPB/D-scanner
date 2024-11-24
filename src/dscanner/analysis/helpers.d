@@ -78,9 +78,9 @@ private static immutable fileEol = q{
  * comment. Alternatively you can also just write `// fix` to apply the only
  * available suggestion.
  */
-void assertAutoFix(string before, string after, const StaticAnalysisConfig config, bool useDmd = false,
-		const AutoFixFormatting formattingConfig = AutoFixFormatting(AutoFixFormatting.BraceStyle.otbs, "\t", 4, fileEol),
-		string file = __FILE__, size_t line = __LINE__)
+void assertAutoFix(string before, string after, const StaticAnalysisConfig config,
+	const AutoFixFormatting formattingConfig = AutoFixFormatting(AutoFixFormatting.BraceStyle.otbs, "\t", 4, fileEol),
+	string file = __FILE__, size_t line = __LINE__)
 {
 	import dparse.lexer : StringCache, Token;
 	import dscanner.analysis.autofix : improveAutoFixWhitespace;
@@ -95,12 +95,8 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 	import dscanner.analysis.rundmd : analyzeDmd, parseDmdModule;
 	import dscanner.utils : getModuleName;
 
-	// TODO: Ignore linter error
-	if (!useDmd)
-	{
-		auto x = &formattingConfig;
-		x = null;
-	}
+	auto x = &formattingConfig;
+	x = null;
 
 	MessageSet rawWarnings;
 

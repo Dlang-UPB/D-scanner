@@ -227,7 +227,7 @@ unittest
 				}
 			}
 		}
-	}c, sac, true);
+	}c, sac);
 
 	stderr.writeln("Unittest for StaticIfElse passed.");
 }

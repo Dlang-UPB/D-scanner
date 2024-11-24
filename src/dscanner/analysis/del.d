@@ -78,7 +78,7 @@ unittest
 			auto a = new Class();
 			destroy(a); // fix
 		}
-	}c, sac, true);
+	}c, sac);
 
 	stderr.writeln("Unittest for DeleteCheck passed.");
 }

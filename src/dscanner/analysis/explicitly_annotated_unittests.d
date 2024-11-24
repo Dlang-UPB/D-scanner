@@ -96,7 +96,7 @@ unittest
 			@system unittest {} // fix:1
 			pure nothrow @nogc @system unittest {} // fix:1
 		}
-	}c, sac, true);
+	}c, sac);
 
 	stderr.writeln("Unittest for ExplicitlyAnnotatedUnittestCheck passed.");
 }

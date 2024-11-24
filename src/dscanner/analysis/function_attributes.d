@@ -321,7 +321,7 @@ unittest
 
 			int method(); // fix
 		}
-	}c, sac, true);
+	}c, sac);
 
 	stderr.writeln("Unittest for ObjectConstCheck passed.");
 }
