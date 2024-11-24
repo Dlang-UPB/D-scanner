@@ -11,7 +11,7 @@ import dparse.ast : Module;
 
 import dsymbol.modulecache : ModuleCache;
 
-import dscanner.analysis.base : AutoFix, AutoFixFormatting, BaseAnalyzer, Message;
+import dscanner.analysis.base : AutoFix, AutoFixFormatting, BaseAnalyzer, BaseAnalyzerDmd, Message;
 import dscanner.analysis.config : StaticAnalysisConfig;
 import dscanner.analysis.run : analyze, doNothing;
 import dscanner.analysis.rundmd;
@@ -20,6 +20,7 @@ import dscanner.utils : readFile, readStdin;
 private void resolveAutoFixes(
 	ref Message message,
 	string fileName,
+	const(char[]) moduleName,
 	ref ModuleCache moduleCache,
 	scope const(Token)[] tokens,
 	const Module m,
@@ -27,11 +28,12 @@ private void resolveAutoFixes(
 	const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid
 )
 {
-	resolveAutoFixes(message.checkName, message.autofixes, fileName, moduleCache,
+	resolveAutoFixes(message.checkName, message.autofixes, fileName, moduleName, moduleCache,
 		tokens, m, analysisConfig, overrideFormattingConfig);
 }
 
 private void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, string fileName,
+	const(char[]) moduleName,
 	ref ModuleCache moduleCache,
 	scope const(Token)[] tokens, const Module m,
 	const StaticAnalysisConfig analysisConfig,
@@ -45,6 +47,7 @@ private void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, stri
 	import dsymbol.string_interning : internString;
 	import dsymbol.symbol : DSymbol;
 	import dscanner.analysis.run : getAnalyzersForModuleAndConfig;
+	import dscanner.analysis.rundmd : getDmdAnalyzersForModuleAndConfig;
 
 	const(AutoFixFormatting) formattingConfig =
 	overrideFormattingConfig is AutoFixFormatting.invalid
@@ -64,7 +67,7 @@ private void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, stri
 	scope (exit)
 	GC.enable;
 
-	foreach (BaseAnalyzer check; getAnalyzersForModuleAndConfig(fileName, tokens, m, analysisConfig, moduleScope))
+	foreach (BaseAnalyzerDmd check; getDmdAnalyzersForModuleAndConfig(fileName, analysisConfig, moduleName))
 	{
 		if (check.getName() == messageCheckName)
 		{
@@ -79,7 +82,7 @@ private void resolveAutoFixes(string messageCheckName, AutoFix[] autofixes, stri
 
 void resolveAutoFixFromCheck(
 	ref AutoFix autofix,
-	BaseAnalyzer check,
+	BaseAnalyzerDmd check,
 	const Module m,
 	scope const(Token)[] tokens,
 	const AutoFixFormatting formattingConfig
@@ -87,12 +90,12 @@ void resolveAutoFixFromCheck(
 {
 	import std.sumtype : match;
 
-	autofix.replacements.match!(
-			(AutoFix.ResolveContext context) {
-			autofix.replacements = check.resolveAutoFix(m, tokens, context, formattingConfig);
-		},
-			(_) {}
-	);
+	//autofix.replacements.match!(
+	//		(AutoFix.ResolveContext context) {
+	//		autofix.replacements = check.resolveAutoFix(m, tokens, context, formattingConfig);
+	//	},
+	//		(_) {}
+	//);
 }
 
 private AutoFix.CodeReplacement[] resolveAutoFix(string messageCheckName, AutoFix.ResolveContext context,
@@ -104,8 +107,8 @@ private AutoFix.CodeReplacement[] resolveAutoFix(string messageCheckName, AutoFi
 {
 	AutoFix temp;
 	temp.replacements = context;
-	resolveAutoFixes(messageCheckName, (&temp)[0 .. 1], fileName, moduleCache,
-	tokens, m, analysisConfig, overrideFormattingConfig);
+	//resolveAutoFixes(messageCheckName, (&temp)[0 .. 1], fileName, moduleCache,
+	//tokens, m, analysisConfig, overrideFormattingConfig);
 	return temp.expectReplacements("resolving didn't work?!");
 }
 
@@ -163,14 +166,15 @@ void listAutofixes(
 
 	auto code = readFile(fileName);
 	auto dmdModule = parseDmdModule(fileName, cast(string) code);
-	auto messages = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
+	auto moduleName = getModuleName(dmdModule.md);
+	auto messages = analyzeDmd(fileName, dmdModule, moduleName, config);
 
 	with (stdout.lockingTextWriter)
 	{
 		put("[");
 		foreach (message; messages[].filter!matchesCursor)
 		{
-			resolveAutoFixes(message, fileName, moduleCache, tokens, mod, config);
+			//resolveAutoFixes(message, fileName, moduleCache, tokens, mod, config);
 
 			foreach (i, autofix; message.autofixes)
 			{

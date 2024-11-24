@@ -30,6 +30,7 @@ import std.experimental.allocator.building_blocks.allocator_list : AllocatorList
 import dscanner.analysis.autofix : improveAutoFixWhitespace;
 import dscanner.analysis.config;
 import dscanner.analysis.base;
+import dscanner.analysis.rundmd;
 import dscanner.analysis.style;
 import dscanner.analysis.enumarrayliteral;
 import dscanner.analysis.pokemon;
@@ -330,7 +331,8 @@ void generateReport(string[] fileNames, const StaticAnalysisConfig config,
 		const(Token)[] tokens;
 		const Module m = parseModule(fileName, code, &r, cache, tokens, writeMessages, &lineOfCodeCount, null, null);
 		stats.visit(m);
-		MessageSet messageSet = analyze(fileName, m, config, moduleCache, tokens, true);
+		auto dmdModule = parseDmdModule(fileName, cast(string) code);
+		MessageSet messageSet = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 		reporter.addMessageSet(messageSet);
 	}
 
@@ -367,7 +369,8 @@ void generateSonarQubeGenericIssueDataReport(string[] fileNames, const StaticAna
 		RollbackAllocator r;
 		const(Token)[] tokens;
 		const Module m = parseModule(fileName, code, &r, cache, tokens, writeMessages, null, null, null);
-		MessageSet messageSet = analyze(fileName, m, config, moduleCache, tokens, true);
+		auto dmdModule = parseDmdModule(fileName, cast(string) code);
+		MessageSet messageSet = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 		reporter.addMessageSet(messageSet);
 	}
 
@@ -392,9 +395,6 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		ref StringCache cache, ref ModuleCache moduleCache, bool staticAnalyze = true)
 {
 	import std.string : toStringz;
-	import dscanner.analysis.rundmd : parseDmdModule;
-
-	import dscanner.analysis.rundmd : analyzeDmd;
 
 	bool hasErrors;
 	foreach (fileName; fileNames)
@@ -459,7 +459,8 @@ bool autofix(string[] fileNames, const StaticAnalysisConfig config, string error
 		assert(m);
 		if (errorCount > 0)
 			hasErrors = true;
-		MessageSet results = analyze(fileName, m, config, moduleCache, tokens, true, true, overrideFormattingConfig);
+		auto dmdModule = parseDmdModule(fileName, cast(string) code);
+		MessageSet results = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 		if (results is null)
 			continue;
 
@@ -669,7 +670,7 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid)
 {
 	import dsymbol.symbol : DSymbol;
-	import dscanner.analysis.autofix : resolveAutoFixFromCheck;
+	//import dscanner.analysis.autofix : resolveAutoFixFromCheck;
 
 	if (!staticAnalyze)
 		return null;
@@ -693,17 +694,17 @@ MessageSet analyze(string fileName, const Module m, const StaticAnalysisConfig a
 		GC.enable;
 
 	MessageSet set = new MessageSet;
-	foreach (BaseAnalyzer check; getAnalyzersForModuleAndConfig(fileName, tokens, m, analysisConfig, moduleScope))
-	{
-		check.visit(m);
-		foreach (message; check.messages)
-		{
-			if (resolveAutoFixes)
-				foreach (ref autofix; message.autofixes)
-					autofix.resolveAutoFixFromCheck(check, m, tokens, formattingConfig);
-			set.insert(message);
-		}
-	}
+	//foreach (BaseAnalyzer check; getAnalyzersForModuleAndConfig(fileName, tokens, m, analysisConfig, moduleScope))
+	//{
+	//	check.visit(m);
+	//	foreach (message; check.messages)
+	//	{
+	//		if (resolveAutoFixes)
+	//			foreach (ref autofix; message.autofixes)
+	//				autofix.resolveAutoFixFromCheck(check, m, tokens, formattingConfig);
+	//		set.insert(message);
+	//	}
+	//}
 
 	return set;
 }
