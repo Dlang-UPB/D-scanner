@@ -342,7 +342,7 @@ struct Message
 	/// the `BaseAnalyzer.resolveAutoFix` method with.
 	AutoFix[] autofixes;
 
-	deprecated this(string fileName, size_t line, size_t column, string key = null, string message = null, string checkName = null)
+	this(string fileName, size_t line, size_t column, string key = null, string message = null, string checkName = null)
 	{
 		diagnostic.fileName = fileName;
 		diagnostic.startLine = diagnostic.endLine = line;
@@ -615,6 +615,12 @@ protected:
 	extern (D) void addErrorMessage(size_t line, size_t column, string key, string message, AutoFix[] autofixes)
 	{
 		_messages.insert(Message(fileName, line, column, key, message, getName(), autofixes));
+	}
+
+	extern (D) void addErrorMessage(size_t[2] index, size_t[2] lines, size_t[2] columns, string key, string message)
+	{
+		auto diag = Message.Diagnostic.from(fileName, index, lines, columns, message);
+		_messages.insert(Message(diag, key, getName()));
 	}
 
 	extern (D) void addErrorMessage(size_t[2] index, size_t[2] lines, size_t[2] columns,
