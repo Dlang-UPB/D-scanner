@@ -404,8 +404,7 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
  *
  * Returns: true if there were parse errors.
  */
-bool autofix(string[] fileNames, const StaticAnalysisConfig config, string errorFormat, bool autoApplySingle,
-		const AutoFixFormatting overrideFormattingConfig = AutoFixFormatting.invalid)
+bool autofix(string[] fileNames, const StaticAnalysisConfig config, string errorFormat, bool autoApplySingle)
 {
 	import std.format : format;
 
@@ -419,10 +418,6 @@ bool autofix(string[] fileNames, const StaticAnalysisConfig config, string error
 		auto dmdModule = parseDmdModule(fileName, cast(string) code);
 		if (global.errors > 0)
 			hasErrors = true;
-
-		// TODO: Ignore linter error
-		string x = overrideFormattingConfig.indentation;
-		x = "";
 
 		MessageSet results = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 		if (results is null)

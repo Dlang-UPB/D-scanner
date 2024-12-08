@@ -63,7 +63,6 @@ private static immutable fileEol = q{
  * available suggestion.
  */
 void assertAutoFix(string before, string after, const StaticAnalysisConfig config,
-	const AutoFixFormatting formattingConfig = AutoFixFormatting(AutoFixFormatting.BraceStyle.otbs, "\t", 4, fileEol),
 	string file = __FILE__, size_t line = __LINE__)
 {
 	import std.algorithm : canFind, findSplit, map, sort;
@@ -72,12 +71,7 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 	import std.typecons : tuple, Tuple;
 	import dscanner.analysis.autofix : improveAutoFixWhitespace;
 
-	// TODO: Ignore linter errors
-	auto x = &formattingConfig;
-	x = null;
-
 	MessageSet rawWarnings;
-
 	auto testFileName = "test.d";
 	File f = File(testFileName, "w");
 	scope(exit)
