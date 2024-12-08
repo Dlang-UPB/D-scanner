@@ -2,6 +2,7 @@ module dscanner.analysis.autofix;
 
 import std.algorithm : filter, findSplit;
 import std.conv : to;
+import std.file : exists, remove;
 import std.functional : toDelegate;
 import std.stdio;
 
@@ -9,7 +10,7 @@ import dscanner.analysis.base : AutoFix, AutoFixFormatting, BaseAnalyzer, BaseAn
 import dscanner.analysis.config : StaticAnalysisConfig;
 import dscanner.analysis.run : analyze, doNothing;
 import dscanner.analysis.rundmd;
-import dscanner.utils : readFile, readStdin;
+import dscanner.utils : getModuleName, readFile, readStdin;
 
 void listAutofixes(
 	StaticAnalysisConfig config,
@@ -18,8 +19,6 @@ void listAutofixes(
 	string fileName
 )
 {
-	import dscanner.analysis.base : Message;
-	import dscanner.utils : getModuleName;
 	import std.format : format;
 	import std.json : JSONValue;
 
@@ -51,10 +50,20 @@ void listAutofixes(
 			&& (req.line < m.endLine || req.column <= m.endColumn);
 	}
 
-	// TODO: Ignore linter error
-	usingStdin = usingStdin;
+	ubyte[] code;
+	if (usingStdin)
+	{
+		code = readStdin();
+		fileName = "stdin.d";
+		File f = File(fileName, "w");
+		f.rawWrite(code);
+		f.close();
+	}
+	else
+	{
+		code = readFile(fileName);
+	}
 
-	auto code = readFile(fileName);
 	auto dmdModule = parseDmdModule(fileName, cast(string) code);
 	auto moduleName = getModuleName(dmdModule.md);
 	auto messages = analyzeDmd(fileName, dmdModule, moduleName, config);
@@ -86,6 +95,12 @@ void listAutofixes(
 		put("\n]");
 	}
 	stdout.flush();
+
+	if (usingStdin)
+	{
+		assert(exists(fileName));
+		remove(fileName);
+	}
 }
 
 void improveAutoFixWhitespace(scope const(char)[] code, AutoFix.CodeReplacement[] replacements)

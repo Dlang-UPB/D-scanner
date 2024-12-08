@@ -75,8 +75,8 @@ import dscanner.analysis.redundant_storage_class;
 import dscanner.analysis.unused_result;
 import dscanner.analysis.cyclomatic_complexity;
 import dscanner.analysis.body_on_disabled_funcs;
-import dscanner.utils;
 import dscanner.reports : DScannerJsonReporter, SonarQubeGenericIssueDataReporter;
+import dscanner.utils;
 
 import dmd.astbase : ASTBase;
 import dmd.astcodegen;
@@ -352,10 +352,27 @@ void generateSonarQubeGenericIssueDataReport(string[] fileNames, const StaticAna
  */
 bool analyze(string[] fileNames, const StaticAnalysisConfig config, string errorFormat)
 {
+	import std.file : exists, remove;
+
 	bool hasErrors;
 	foreach (fileName; fileNames)
 	{
-		auto code = readFile(fileName);
+		bool isStdin;
+		ubyte[] code;
+
+		if (fileName == "stdin")
+		{
+			code = readStdin();
+			fileName = "stdin.d";
+			File f = File(fileName, "w");
+			f.rawWrite(code);
+			f.close();
+			isStdin = true;
+		}
+		else
+		{
+			code = readFile(fileName);
+		}
 		// Skip files that could not be read and continue with the rest
 		if (code.length == 0)
 			continue;
@@ -369,6 +386,12 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 		hasErrors = !results.empty;
 		foreach (result; results[])
 			messageFunctionFormat(errorFormat, result, false, code);
+
+		if (isStdin)
+		{
+			assert(exists(fileName));
+			remove(fileName);
+		}
 	}
 	return hasErrors;
 }
