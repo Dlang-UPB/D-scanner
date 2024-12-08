@@ -6,6 +6,8 @@
 module dscanner.analysis.helpers;
 
 import core.exception : AssertError;
+import std.file : exists, remove;
+import std.path : dirName;
 import std.stdio;
 import std.string;
 import std.traits;
@@ -13,12 +15,12 @@ import std.traits;
 import dparse.ast;
 import dparse.lexer : tok, Token;
 import dparse.rollback_allocator;
+
 import dscanner.analysis.base;
 import dscanner.analysis.config;
 import dscanner.analysis.run;
-import dsymbol.modulecache : ModuleCache;
-import std.experimental.allocator;
-import std.experimental.allocator.mallocator;
+import dscanner.analysis.rundmd;
+import dscanner.utils : getModuleName;
 
 import dmd.astbase : ASTBase;
 import dmd.astcodegen;
@@ -46,24 +48,6 @@ S after(S)(S value, S separator) if (isSomeString!S)
 	return value[i + separator.length .. $];
 }
 
-string getLineIndentation(scope const(Token)[] tokens, size_t line, const AutoFixFormatting formatting)
-{
-	import std.algorithm : countUntil;
-	import std.array : array;
-	import std.range : repeat;
-	import std.string : lastIndexOfAny;
-
-	auto idx = tokens.countUntil!(a => a.line == line);
-	if (idx == -1 || tokens[idx].column <= 1 || !formatting.indentation.length)
-		return "";
-
-	auto indent = tokens[idx].column - 1;
-	if (formatting.indentation[0] == '\t')
-		return (cast(immutable)'\t').repeat(indent).array;
-	else
-		return (cast(immutable)' ').repeat(indent).array;
-}
-
 /// EOL inside this project, for tests
 private static immutable fileEol = q{
 };
@@ -82,19 +66,13 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 	const AutoFixFormatting formattingConfig = AutoFixFormatting(AutoFixFormatting.BraceStyle.otbs, "\t", 4, fileEol),
 	string file = __FILE__, size_t line = __LINE__)
 {
-	import dparse.lexer : StringCache, Token;
-	import dscanner.analysis.autofix : improveAutoFixWhitespace;
-	import dscanner.analysis.run : parseModule;
 	import std.algorithm : canFind, findSplit, map, sort;
 	import std.conv : to;
 	import std.sumtype : match;
 	import std.typecons : tuple, Tuple;
-	import std.file : exists, remove;
-	import std.path : dirName;
-	import std.stdio : File;
-	import dscanner.analysis.rundmd : analyzeDmd, parseDmdModule;
-	import dscanner.utils : getModuleName;
+	import dscanner.analysis.autofix : improveAutoFixWhitespace;
 
+	// TODO: Ignore linter errors
 	auto x = &formattingConfig;
 	x = null;
 
@@ -135,8 +113,7 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 		immutable size_t rawLine = rawWarning.endLine;
 		if (rawLine == 0)
 		{
-			stderr.writefln("!!! Skipping warning because it is on line zero:\n%s",
-					rawWarning.message);
+			stderr.writefln("!!! Skipping warning because it is on line zero:\n%s", rawWarning.message);
 			continue;
 		}
 
@@ -150,27 +127,22 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 				assert(i >= 0, "can't use negative autofix indices");
 				if (i >= rawWarning.autofixes.length)
 					throw new AssertError("autofix index out of range, diagnostic only has %s autofixes (%s)."
-						.format(rawWarning.autofixes.length, rawWarning.autofixes.map!"a.name"),
-							file, rawLine + line);
+						.format(rawWarning.autofixes.length, rawWarning.autofixes.map!"a.name"),file, rawLine + line);
 				toApply ~= tuple(rawWarning, i);
 			}
 			else
 			{
 				if (rawWarning.autofixes.length != 1)
 					throw new AssertError("diagnostic has %s autofixes (%s), but expected exactly one."
-						.format(rawWarning.autofixes.length, rawWarning.autofixes.map!"a.name"),
-							file, rawLine + line);
+						.format(rawWarning.autofixes.length, rawWarning.autofixes.map!"a.name"), file, rawLine + line);
 				toApply ~= tuple(rawWarning, 0);
 			}
 		}
 	}
 
 	foreach (i, codeLine; codeLines)
-	{
 		if (!applyLines.canFind(i) && codeLine.canFind("// fix"))
-			throw new AssertError("Missing expected warning for autofix on line %s"
-				.format(i + line), file, i + line);
-	}
+			throw new AssertError("Missing expected warning for autofix on line %s".format(i + line), file, i + line);
 
 	AutoFix.CodeReplacement[] replacements;
 
@@ -187,10 +159,7 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 
 	string newCode = before;
 	foreach_reverse (replacement; replacements)
-	{
-		newCode = newCode[0 .. replacement.range[0]] ~ replacement.newText
-			~ newCode[replacement.range[1] .. $];
-	}
+		newCode = newCode[0 .. replacement.range[0]] ~ replacement.newText ~ newCode[replacement.range[1] .. $];
 
 	if (newCode != after)
 	{
@@ -219,11 +188,6 @@ void assertAutoFix(string before, string after, const StaticAnalysisConfig confi
 void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config, bool semantic = false,
 		string file = __FILE__, size_t line = __LINE__)
 {
-	import std.file : exists, remove;
-	import std.path : dirName;
-	import std.stdio : File;
-	import dscanner.analysis.rundmd : analyzeDmd, parseDmdModule;
-	import dscanner.utils : getModuleName;
 	import dmd.globals : global;
 
 	auto testFileName = "test.d";
@@ -317,6 +281,7 @@ void assertAnalyzerWarningsDMD(string code, const StaticAnalysisConfig config, b
 					lineNo, codeLines[lineNo - line]);
 		}
 	}
+
 	if (unexpectedWarnings.length)
 	{
 		immutable string message = "Unexpected warnings:\n" ~ unexpectedWarnings.join("\n");
