@@ -329,7 +329,7 @@ else
 		}
 		else if (resolveMessage.length)
 		{
-			listAutofixes(config, resolveMessage, usingStdin, usingStdin ? "stdin" : args[1], &cache, moduleCache);
+			listAutofixes(config, resolveMessage, usingStdin, usingStdin ? "stdin" : args[1]);
 			return 0;
 		}
 		else if (report)
