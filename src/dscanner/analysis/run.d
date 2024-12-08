@@ -81,6 +81,7 @@ import dscanner.utils;
 import dmd.astbase : ASTBase;
 import dmd.astcodegen;
 import dmd.frontend;
+import dmd.globals : global;
 import dmd.parse : Parser;
 
 bool first = true;
@@ -378,6 +379,8 @@ bool analyze(string[] fileNames, const StaticAnalysisConfig config, string error
 			continue;
 
 		auto dmdModule = parseDmdModule(fileName, cast(string) code);
+		if (global.errors > 0 || global.warnings > 0)
+			hasErrors = true;
 		MessageSet results = analyzeDmd(fileName, dmdModule, getModuleName(dmdModule.md), config);
 
 		if (results is null)
@@ -414,6 +417,9 @@ bool autofix(string[] fileNames, const StaticAnalysisConfig config, string error
 		if (code.length == 0)
 			continue;
 		auto dmdModule = parseDmdModule(fileName, cast(string) code);
+		if (global.errors > 0)
+			hasErrors = true;
+
 		// TODO: Ignore linter error
 		string x = overrideFormattingConfig.indentation;
 		x = "";
