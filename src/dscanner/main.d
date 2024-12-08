@@ -325,7 +325,7 @@ else
 
 		if (autofix)
 		{
-			return .autofix(expandedArgs, config, errorFormat, cache, moduleCache, applySingleFixes) ? 1 : 0;
+			return .autofix(expandedArgs, config, errorFormat, applySingleFixes) ? 1 : 0;
 		}
 		else if (resolveMessage.length)
 		{
@@ -341,19 +341,19 @@ else
 					goto case;
 				case "":
 				case "dscanner":
-					generateReport(expandedArgs, config, cache, moduleCache, reportFile);
+					generateReport(expandedArgs, config, reportFile);
 					break;
 				case "sonarQubeGenericIssueData":
-					generateSonarQubeGenericIssueDataReport(expandedArgs, config, cache, moduleCache, reportFile);
+					generateSonarQubeGenericIssueDataReport(expandedArgs, config, reportFile);
 					break;
 			}
 		}
 		else
-			return analyze(expandedArgs, config, errorFormat, cache, moduleCache, true) ? 1 : 0;
+			return analyze(expandedArgs, config, errorFormat) ? 1 : 0;
 	}
 	else if (syntaxCheck)
 	{
-		return .syntaxCheck(usingStdin ? ["stdin"] : expandedArgs, errorFormat, cache, moduleCache) ? 1 : 0;
+		return .syntaxCheck(usingStdin ? ["stdin"] : expandedArgs, errorFormat) ? 1 : 0;
 	}
 	else
 	{

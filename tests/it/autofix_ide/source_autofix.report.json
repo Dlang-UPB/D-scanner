@@ -131,8 +131,8 @@
 			"type": "warn"
 		}
 	],
-	"lineOfCodeCount": 3,
-	"statementCount": 4,
+	"lineOfCodeCount": 0,
+	"statementCount": 2,
 	"structCount": 1,
 	"templateCount": 0,
 	"undocumentedPublicSymbols": 0
