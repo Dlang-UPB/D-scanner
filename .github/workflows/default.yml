@@ -169,7 +169,13 @@ jobs:
           "./bin/dscanner$EXE" --styleCheck -f "$FORMAT" src
 
       - name: Integration Tests
-        run: ./it.sh
+#        run: ./it.sh
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            ./it.sh Windows
+          else
+            ./it.sh Unix
+          fi
         working-directory: tests
         shell: bash
 
