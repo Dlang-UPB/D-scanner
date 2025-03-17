@@ -12,7 +12,7 @@ jobs:
     name: Run all tests
 
     # Only run for the main repository - not forks
-    if: ${{ github.repository == 'dlang-community/D-Scanner' }}
+    if: ${{ github.repository == 'Dlang-UPB/D-Scanner' }}
 
     # Run permutations of common os + host compilers
     strategy:
@@ -57,6 +57,11 @@ jobs:
               dmd: gdc-12
             host: macos-latest
 
+          # Restrict DMD to macOS latest
+          - compiler:
+              dmd: dmd
+            host: macos-latest
+
           #  Omit dub builds for GDC because dub rejects the old fronted revision
           - compiler:
               dmd: gdc-12
@@ -65,15 +70,26 @@ jobs:
         include:
           - { do_report: 1, build: { type: dub, version: 'current' }, host: 'ubuntu-22.04', compiler: { version: dmd-latest, dmd: dmd } }
 
+          - compiler:
+              dmd: dmd
+            host: macos-13
+            build:
+              type: 'dub'
+              version: 'current'
+
     runs-on: ${{ matrix.host }}
 
     steps:
       # Clone repo + submodules
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
            submodules: 'recursive'
            fetch-depth: 0
+
+      # Uncomment to get a ssh connection inside the GH Actions runner
+#      - name: Setup upterm session
+#        uses: lhotari/action-upterm@v1
 
       # Install the host compiler (DMD or LDC)
       # Also grabs DMD for GDC to include dub + rdmd
@@ -102,7 +118,8 @@ jobs:
             ./build.bat
             ./build.bat test
           else
-            make "-j$(nproc)" all test
+            NUM_PROC=$(nproc || getconf _NPROCESSORS_ONLN || 1)
+            make "-j$((NUM_PROC / 2))" all test
           fi
 
       # Compile D-Scanner and execute all tests using a specific dependency version
@@ -123,7 +140,7 @@ jobs:
           dub build
           dub test
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: bin-${{matrix.build.type}}-${{matrix.build.version}}-${{ matrix.compiler.dmd }}-${{ matrix.host }}
           path: bin
@@ -147,19 +164,33 @@ jobs:
           "./bin/dscanner$EXE" --styleCheck -f "$FORMAT" src
 
       - name: Integration Tests
-        run: ./it.sh
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            ./it.sh Windows
+          else
+            ./it.sh Unix
+          fi
         working-directory: tests
         shell: bash
 
+      - name: Run style checks
+        if: ${{ matrix.compiler.dmd == 'dmd' && matrix.build.type == 'make' }}
+        run: |
+          make style
+
       # Parse phobos to check for failures / crashes / ...
       - name: Checkout Phobos
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: dlang/phobos
           path: phobos
 
+      - name: Setup upterm session
+        if: ${{ matrix.build.type == 'dub' && matrix.host == 'ubuntu-22.04'}}
+        uses: lhotari/action-upterm@v1
+
       - name: Apply D-Scanner to Phobos
-        if:  ${{ matrix.build.version != 'min libdparse'}} # Older versions crash with "Invalid UTF..."
+        if: ${{ matrix.build.version != 'min libdparse'}} # Older versions crash with "Invalid UTF..."
         working-directory: phobos
         shell: bash
         run: |
