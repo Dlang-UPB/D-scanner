@@ -12,7 +12,7 @@ jobs:
     name: Run all tests
 
     # Only run for the main repository - not forks
-    if: ${{ github.repository == 'dlang-community/D-Scanner' }}
+    if: ${{ github.repository == 'Dlang-UPB/D-Scanner' }}
 
     # Run permutations of common os + host compilers
     strategy:
@@ -88,8 +88,8 @@ jobs:
            fetch-depth: 0
 
       # Uncomment to get a ssh connection inside the GH Actions runner
-      #- name: Setup upterm session
-      #  uses: lhotari/action-upterm@v1
+#      - name: Setup upterm session
+#        uses: lhotari/action-upterm@v1
 
       # Install the host compiler (DMD or LDC)
       # Also grabs DMD for GDC to include dub + rdmd
@@ -105,10 +105,6 @@ jobs:
         run: |
           sudo apt-get install gdc-12 -y
           gdc-12 --version
-
-#      - name: Setup upterm session
-#        if: ${{ matrix.build.type == 'dub' && matrix.host == 'macos-latest'}}
-#        uses: lhotari/action-upterm@v1
 
       # Compile D-Scanner and execute all tests without dub
       - name: Build and test without dub
@@ -188,6 +184,10 @@ jobs:
         with:
           repository: dlang/phobos
           path: phobos
+
+      - name: Setup upterm session
+        if: ${{ matrix.build.type == 'dub' && matrix.host == 'ubuntu-22.04'}}
+        uses: lhotari/action-upterm@v1
 
       - name: Apply D-Scanner to Phobos
         if: ${{ matrix.build.version != 'min libdparse'}} # Older versions crash with "Invalid UTF..."
